@@ -1,9 +1,13 @@
 # brandspec
 
-Deterministic brand mark compiler, optical-effect generator, and visual audit CLI.
+[![CI](https://img.shields.io/github/actions/workflow/status/rafifmsn/brandspec/ci.yml?branch=main&label=CI)](https://github.com/rafifmsn/brandspec/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/brandspec)](https://pypi.org/project/brandspec/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
 
 `brandspec` separates **conceptual direction** (authored as a declarative JSON specification) from **geometric execution** (compiled with exact Bezier booleans, symmetry, and optical normalization).
 Given the same `spec.json`, `brandspec` produces a byte-identical monochrome SVG, a 4-panel PNG inspection sheet, and deterministic raster quality metrics with zero headless browser dependencies.
+
+![Brandspec Thumbnail](./brandspec-thumb.jpg)
 
 ## Architecture
 
