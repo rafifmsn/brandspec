@@ -3,18 +3,21 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/rafifmsn/brandspec/ci.yml?branch=main&label=CI)](https://github.com/rafifmsn/brandspec/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/brandspec)](https://pypi.org/project/brandspec/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-`brandspec` separates **conceptual direction** (authored as a declarative JSON specification) from **geometric execution** (compiled with exact Bezier booleans, symmetry, and optical normalization).
-Given the same `spec.json`, `brandspec` produces a byte-identical monochrome SVG, a 4-panel PNG inspection sheet, and deterministic raster quality metrics with zero headless browser dependencies.
+`brandspec` is an agent-first deterministic brand engineering toolkit.
+Instead of letting AI agents write fragile raw SVG coordinates or guess spacing, `brandspec` pairs structured design skills and declarative JSON schemas with an exact geometry compiler and automated visual audit gate.
+The geometric and optical `mark` engine is the first module shipped in `v0.1.0`, resting on a modular core built to expand into wordmarks, lockups, matched iconography, export kits, and a localhost human-in-the-loop review UI.
 
 ![Brandspec Thumbnail](./brandspec-thumb.jpg)
 
 ## Architecture
 
+- **Agent Interface (`skills/brandspec/`, `cli.py`)**: Supplies agents with design construction rules, starter archetypes, deterministic build commands, and machine-readable pass/warn feedback.
 - **Core Geometry (`core/`)**: Resolves centered `square`, `isometric` (30-degree axial), and `polar` grids, builds continuous `grid_path` polylines with exact cubic Bezier corner fillets, applies symmetry, and computes outward `halo` offsets via `skia-pathops`.
-- **Mark Engine (`engines/mark/`)**: Compiles constructive primitives (`grid_path`, `arc_band`, `circle`, `ring`, `rect`, `polygon`) and parametric optical effects (`line_screen`, `radial_blades`, `halftone_grid`) with `clip_to` masks, `halo`, and scoped `halo_targets`.
+- **Mark Engine (`engines/mark/`, v0.1.0)**: Compiles constructive primitives (`grid_path`, `arc_band`, `circle`, `ring`, `rect`, `polygon`) and parametric optical effects (`line_screen`, `radial_blades`, `halftone_grid`) with `clip_to` masks, `halo`, and scoped `halo_targets`.
 - **Visual Inspection (`inspect/`)**: Rasterizes via `resvg-py` to render a 4-panel `sheet.png` and computes `metrics.json` checks via `numpy` and `pillow`.
-- **Expandable Engine Layout**: Designed so future engines (`wordmark`, `lockup`, `icons`, `pattern`, `kit`, `tokens`) and an interactive localhost review surface can plug into the same core and `spec.json` loop.
+- **Expandable Engine Layout**: Designed so upcoming engines (`wordmark`, `lockup`, `icons`, `pattern`, `kit`, `tokens`) and an interactive localhost review surface plug into the same core and `spec.json` loop.
 
 ## Project Layout
 
@@ -43,17 +46,17 @@ brandspec/
 
 Requires Python 3.11 to 3.13 and [`uv`](https://docs.astral.sh/uv/).
 
-Install the CLI globally from GitHub (or PyPI once published):
+Install the CLI globally from PyPI:
 
 ```bash
-uv tool install git+https://github.com/rafifmsn/brandspec
+uv tool install brandspec
 brandspec archetypes
 ```
 
 Or run directly in one command with `uvx`:
 
 ```bash
-uvx --from git+https://github.com/rafifmsn/brandspec brandspec archetypes
+uvx brandspec archetypes
 ```
 
 Or run locally from a clone:
@@ -81,7 +84,7 @@ npx skills add rafifmsn/brandspec
 | `brandspec build <spec.json> [--out-dir <dir>] [--strict]` | Compiles `logo.svg`, `sheet.png`, `metrics.json`, and locked `spec.json`. Exits with code `2` under `--strict` if any quality warning triggers. |
 | `brandspec check <spec.json>` | Validates the schema and prints `metrics.json` without writing output files. |
 
-## Design Specification (`spec.json`)
+## Mark Engine Specification (`spec.json`)
 
 All coordinates, widths, and clearances are expressed in multiples of `unit` on a centered grid origin `(0, 0)`.
 
