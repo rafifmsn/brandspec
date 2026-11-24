@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "name": "Stencil Monogram",
+  "concept": "Modular figure-ground monogram built on a strict square unit grid",
+  "category": "monogram",
+  "unit": 40,
+  "grid": {
+    "type": "square",
+    "divisions": 8
+  },
+  "layers": [
+    {
+      "id": "left-arch",
+      "op": "unite",
+      "shapes": [
+        {
+          "type": "grid_path",
+          "points": [[-3, 3], [-3, -3], [0, -3], [0, 3]],
+          "width": 1.2,
+          "corner_radius": 1.5,
+          "cap": "butt",
+          "join": "miter"
+        }
+      ]
+    },
+    {
+      "id": "right-arch",
+      "op": "unite",
+      "halo": 0.45,
+      "shapes": [
+        {
+          "type": "grid_path",
+          "points": [[0, 3], [0, -3], [3, -3], [3, 3]],
+          "width": 1.2,
+          "corner_radius": 1.5,
+          "cap": "butt",
+          "join": "miter"
+        }
+      ]
+    },
+    {
+      "id": "base-notch",
+      "op": "subtract",
+      "shapes": [
+        {
+          "type": "rect",
+          "center": [0, 2.2],
+          "width": 7.6,
+          "height": 0.45
+        }
+      ]
+    }
+  ],
+  "post": {
+    "canvas_size": 1000,
+    "padding": 110,
+    "optical_center": true,
+    "precision": 2
+  }
+}

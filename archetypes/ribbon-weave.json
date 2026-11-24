@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "name": "Ribbon Weave",
+  "concept": "Two interlocking stadium chain links with alternating over-under halo weave",
+  "category": "geometric",
+  "unit": 40,
+  "grid": {
+    "type": "square",
+    "divisions": 8
+  },
+  "layers": [
+    {
+      "id": "left-link",
+      "op": "unite",
+      "shapes": [
+        {
+          "type": "grid_path",
+          "points": [[-3.8, -1.4], [0.8, -1.4], [0.8, 1.4], [-3.8, 1.4]],
+          "closed": true,
+          "width": 0.9,
+          "corner_radius": 1.4,
+          "join": "round"
+        }
+      ]
+    },
+    {
+      "id": "right-link",
+      "op": "unite",
+      "halo": 0.38,
+      "shapes": [
+        {
+          "type": "grid_path",
+          "points": [[-0.8, -1.4], [3.8, -1.4], [3.8, 1.4], [-0.8, 1.4]],
+          "closed": true,
+          "width": 0.9,
+          "corner_radius": 1.4,
+          "join": "round"
+        }
+      ]
+    },
+    {
+      "id": "top-overpass",
+      "op": "unite",
+      "halo": 0.38,
+      "shapes": [
+        {
+          "type": "grid_path",
+          "points": [[-1.7, -1.4], [0.1, -1.4]],
+          "closed": false,
+          "width": 0.9,
+          "cap": "butt"
+        }
+      ]
+    },
+    {
+      "id": "heal-left-seam",
+      "op": "unite",
+      "shapes": [
+        {
+          "type": "grid_path",
+          "points": [[-2.4, -1.4], [-1.5, -1.4]],
+          "closed": false,
+          "width": 0.9,
+          "cap": "butt"
+        }
+      ]
+    }
+  ],
+  "post": {
+    "canvas_size": 1000,
+    "padding": 110,
+    "optical_center": true,
+    "precision": 2
+  }
+}

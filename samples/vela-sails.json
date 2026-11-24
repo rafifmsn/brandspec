@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "name": "VELA Maritime",
+  "concept": "Twin geometric wind-filled sails over a progressive optical line-screen sea hull",
+  "category": "effect",
+  "unit": 40,
+  "grid": {
+    "type": "square",
+    "divisions": 8
+  },
+  "layers": [
+    {
+      "id": "main-sail-block",
+      "op": "unite",
+      "shapes": [
+        {
+          "type": "grid_path",
+          "points": [[-2.6, 0.8], [0.6, -3.6], [0.6, 0.8]],
+          "closed": true,
+          "width": 0.0
+        },
+        {
+          "type": "grid_path",
+          "points": [[1.1, 0.8], [1.1, -2.4], [3.4, 0.8]],
+          "closed": true,
+          "width": 0.0
+        }
+      ]
+    },
+    {
+      "id": "wind-billow-carve",
+      "op": "subtract",
+      "shapes": [
+        {
+          "type": "circle",
+          "center": [-2.4, -2.0],
+          "radius": 2.65
+        }
+      ]
+    },
+    {
+      "id": "hull-stripes",
+      "op": "unite",
+      "shapes": [
+        {
+          "type": "line_screen",
+          "center": [0, 2.3],
+          "angle_deg": 0,
+          "count": 5,
+          "pitch": 0.56,
+          "length": 7.6,
+          "min_width": 0.14,
+          "max_width": 0.36,
+          "profile": "linear",
+          "invert_profile": true
+        }
+      ],
+      "clip_to": [
+        {
+          "type": "grid_path",
+          "points": [[-3.5, 1.1], [3.5, 1.1], [2.2, 3.6], [-2.2, 3.6]],
+          "closed": true,
+          "width": 0.0
+        }
+      ]
+    }
+  ],
+  "post": {
+    "canvas_size": 1000,
+    "padding": 110,
+    "optical_center": true,
+    "precision": 2
+  }
+}

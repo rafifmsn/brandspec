@@ -1,0 +1,28 @@
+[project]
+name = "logo-mod"
+version = "0.1.0"
+description = "Deterministic Logo Modernism vector compiler and visual inspection CLI"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "numpy>=1.26",
+    "pillow>=10.0",
+    "pydantic>=2.7",
+    "resvg-py>=0.2",
+    "skia-pathops>=0.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+logo-mod = "logo_mod.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/logo_mod"]

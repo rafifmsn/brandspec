@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "name": "Radial Vortex",
+  "concept": "Six-fold twisted rotational blades forming an optical aperture",
+  "category": "effect",
+  "unit": 40,
+  "grid": {
+    "type": "polar",
+    "divisions": 12
+  },
+  "layers": [
+    {
+      "id": "outer-ring",
+      "op": "unite",
+      "shapes": [
+        {
+          "type": "radial_blades",
+          "center": [0, 0],
+          "count": 6,
+          "inner_radius": 0.95,
+          "outer_radius": 4.0,
+          "angle_deg": 0,
+          "twist_deg": 42,
+          "inner_width_deg": 34,
+          "outer_width_deg": 24,
+          "curve_bias": 0.55
+        }
+      ]
+    },
+    {
+      "id": "core-void",
+      "op": "subtract",
+      "shapes": [
+        {
+          "type": "circle",
+          "center": [0, 0],
+          "radius": 1.1
+        }
+      ]
+    }
+  ],
+  "post": {
+    "canvas_size": 1000,
+    "padding": 110,
+    "optical_center": true,
+    "precision": 2
+  }
+}

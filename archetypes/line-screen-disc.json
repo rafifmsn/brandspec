@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "name": "Line Screen Disc",
+  "concept": "Progressive optical line modulation clipped to a modernist sphere with diagonal slice",
+  "category": "effect",
+  "unit": 40,
+  "grid": {
+    "type": "square",
+    "divisions": 8
+  },
+  "layers": [
+    {
+      "id": "modulated-disc",
+      "op": "unite",
+      "shapes": [
+        {
+          "type": "line_screen",
+          "center": [0, 0],
+          "angle_deg": 0,
+          "count": 13,
+          "pitch": 0.62,
+          "length": 9.0,
+          "min_width": 0.14,
+          "max_width": 0.50,
+          "profile": "linear"
+        }
+      ],
+      "clip_to": [
+        {
+          "type": "circle",
+          "center": [0, 0],
+          "radius": 3.8
+        }
+      ]
+    },
+    {
+      "id": "horizon-cut",
+      "op": "subtract",
+      "shapes": [
+        {
+          "type": "grid_path",
+          "points": [[-4.5, 1.5], [4.5, -1.5]],
+          "width": 0.55,
+          "cap": "butt"
+        }
+      ]
+    }
+  ],
+  "post": {
+    "canvas_size": 1000,
+    "padding": 110,
+    "optical_center": true,
+    "precision": 2
+  }
+}

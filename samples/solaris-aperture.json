@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "name": "SOLARIS Optics",
+  "concept": "Eight-blade kinetic aperture surrounded by a four-fold segmented optical ring",
+  "category": "effect",
+  "unit": 40,
+  "grid": {
+    "type": "polar",
+    "divisions": 12
+  },
+  "layers": [
+    {
+      "id": "aperture-blades",
+      "op": "unite",
+      "shapes": [
+        {
+          "type": "radial_blades",
+          "center": [0, 0],
+          "count": 8,
+          "inner_radius": 0.75,
+          "outer_radius": 2.75,
+          "angle_deg": 0,
+          "twist_deg": 34,
+          "inner_width_deg": 24,
+          "outer_width_deg": 18,
+          "curve_bias": 0.52
+        }
+      ]
+    },
+    {
+      "id": "segmented-corona",
+      "op": "unite",
+      "halo": 0.32,
+      "shapes": [
+        {
+          "type": "arc_band",
+          "center": [0, 0],
+          "radius": 3.55,
+          "start_deg": 8,
+          "end_deg": 74,
+          "width": 0.75,
+          "cap": "butt"
+        }
+      ],
+      "symmetry": {
+        "type": "rotate",
+        "count": 4
+      }
+    },
+    {
+      "id": "core-pupil",
+      "op": "subtract",
+      "shapes": [
+        {
+          "type": "circle",
+          "center": [0, 0],
+          "radius": 0.85
+        }
+      ]
+    }
+  ],
+  "post": {
+    "canvas_size": 1000,
+    "padding": 110,
+    "optical_center": true,
+    "precision": 2
+  }
+}

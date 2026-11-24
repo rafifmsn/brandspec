@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "name": "Iso Impossible",
+  "concept": "Three-fold isometric folded ribbon hexagon with exact rotational negative space",
+  "category": "geometric",
+  "unit": 40,
+  "grid": {
+    "type": "isometric",
+    "divisions": 8
+  },
+  "layers": [
+    {
+      "id": "folded-arm",
+      "op": "unite",
+      "shapes": [
+        {
+          "type": "grid_path",
+          "points": [[-1.5, -0.5], [0, -2], [1.45, -2], [0.25, -0.8]],
+          "width": 0.92,
+          "cap": "butt",
+          "join": "miter"
+        }
+      ]
+    }
+  ],
+  "symmetry": {
+    "type": "rotate",
+    "count": 3
+  },
+  "post": {
+    "canvas_size": 1000,
+    "padding": 110,
+    "optical_center": true,
+    "precision": 2
+  }
+}
