@@ -1,4 +1,4 @@
-"""CLI entrypoint for logo-mod."""
+"""CLI entrypoint for brandspec."""
 
 from __future__ import annotations
 
@@ -10,19 +10,16 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .compiler import compile_spec
+from .engines.mark.compiler import compile_spec
+from .engines.mark.schema import MarkSpec
 from .inspect import analyze_compiled, render_inspection_sheet
-from .schema import LogoSpec
 
 
 def _find_archetypes_dir() -> Path:
-    pkg_dir = Path(str(resources.files("logo_mod").joinpath("archetypes")))
+    pkg_dir = Path(str(resources.files("brandspec").joinpath("engines/mark/archetypes")))
     if pkg_dir.is_dir():
         return pkg_dir
-    cwd_dir = Path.cwd() / "archetypes"
-    if cwd_dir.is_dir():
-        return cwd_dir
-    raise FileNotFoundError("Could not locate archetypes directory.")
+    raise FileNotFoundError("Could not locate bundled mark archetypes directory.")
 
 
 def cmd_archetypes(_args: argparse.Namespace) -> int:
@@ -48,9 +45,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-def _load_spec(spec_path: Path) -> LogoSpec:
+def _load_spec(spec_path: Path) -> MarkSpec:
     raw = json.loads(spec_path.read_text(encoding="utf-8"))
-    return LogoSpec.model_validate(raw)
+    return MarkSpec.model_validate(raw)
 
 
 def cmd_build(args: argparse.Namespace) -> int:
@@ -111,12 +108,12 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="logo-mod",
-        description="Deterministic Logo Modernism vector compiler and inspection CLI.",
+        prog="brandspec",
+        description="Deterministic brand specification compiler and visual audit CLI.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_arch = sub.add_parser("archetypes", help="List available Logo Modernism starter archetypes")
+    p_arch = sub.add_parser("archetypes", help="List bundled mark starter archetypes")
     p_arch.set_defaults(func=cmd_archetypes)
 
     p_init = sub.add_parser("init", help="Copy an archetype spec to a working spec.json")

@@ -7,13 +7,8 @@ import math
 import numpy as np
 import pathops
 
-from .grid import grid_to_xy
-from .schema import (
-    GridSpec,
-    HalftoneGridShape,
-    LineScreenShape,
-    RadialBladesShape,
-)
+from ...core.grid import GridSpec, grid_to_xy
+from .schema import HalftoneGridShape, LineScreenShape, RadialBladesShape
 
 
 def _eval_line_profile(

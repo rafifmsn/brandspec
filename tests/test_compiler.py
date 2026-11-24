@@ -1,4 +1,4 @@
-"""Determinism, schema, and archetype compilation tests for logo-mod."""
+"""Determinism, schema, and archetype compilation tests for brandspec."""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ from importlib import resources
 import json
 from pathlib import Path
 
-from logo_mod.compiler import compile_spec
-from logo_mod.inspect import analyze_compiled
-from logo_mod.schema import LogoSpec
+from brandspec.engines.mark.compiler import compile_spec
+from brandspec.engines.mark.schema import MarkSpec
+from brandspec.inspect import analyze_compiled
 
-ARCHETYPES_DIR = Path(str(resources.files("logo_mod").joinpath("archetypes")))
+ARCHETYPES_DIR = Path(str(resources.files("brandspec").joinpath("engines/mark/archetypes")))
 SAMPLES_DIR = Path(__file__).resolve().parents[1] / "samples"
 
 
@@ -20,7 +20,7 @@ def test_all_archetypes_and_samples_compile_deterministically() -> None:
 
     for spec_file in files:
         raw = json.loads(spec_file.read_text(encoding="utf-8"))
-        spec = LogoSpec.model_validate(raw)
+        spec = MarkSpec.model_validate(raw)
 
         first = compile_spec(spec)
         second = compile_spec(spec)
@@ -35,7 +35,7 @@ def test_all_archetypes_and_samples_compile_deterministically() -> None:
 
 
 def test_halo_carves_uniform_clearance() -> None:
-    spec = LogoSpec.model_validate(
+    spec = MarkSpec.model_validate(
         {
             "name": "Halo Test",
             "concept": "Crossing bars with halo",
@@ -62,7 +62,7 @@ def test_halo_carves_uniform_clearance() -> None:
 
 
 def test_halo_targets_scopes_clearance_without_self_cut() -> None:
-    spec = LogoSpec.model_validate(
+    spec = MarkSpec.model_validate(
         {
             "name": "Scoped Halo Test",
             "concept": "Overpass carves only crossing band without cutting base bar",
@@ -91,6 +91,5 @@ def test_halo_targets_scopes_clearance_without_self_cut() -> None:
     )
     compiled = compile_spec(spec)
     metrics = analyze_compiled(compiled)
-    # base-bar stays intact as 1 piece; cross-bar splits into top and bottom stubs = 3 islands
     assert metrics.island_count == 3
     assert metrics.passed

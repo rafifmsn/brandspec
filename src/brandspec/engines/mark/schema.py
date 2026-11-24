@@ -1,4 +1,4 @@
-"""Pydantic DSL schema for deterministic Logo Modernism specifications."""
+"""Pydantic DSL schema for deterministic mark specifications."""
 
 from __future__ import annotations
 
@@ -6,27 +6,8 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field
 
-Point2D = tuple[float, float]
-
-
-class GridSpec(BaseModel):
-    type: Literal["square", "isometric", "polar"] = "square"
-    divisions: int = Field(default=8, ge=2, le=32)
-
-
-class SymmetrySpec(BaseModel):
-    type: Literal[
-        "none",
-        "mirror_x",
-        "mirror_y",
-        "mirror_xy",
-        "rotate",
-        "glide_x",
-    ] = "none"
-    count: int = Field(default=4, ge=2, le=36)
-    step_deg: float | None = None
-    scale_step: float = Field(default=1.0, gt=0.1, le=2.0)
-    offset: float = 0.0
+from ...core.grid import GridSpec, Point2D
+from ...core.paths import PostProcessSpec, SymmetrySpec
 
 
 class GridPathShape(BaseModel):
@@ -161,15 +142,7 @@ class LayerSpec(BaseModel):
     symmetry: SymmetrySpec | None = None
 
 
-class PostProcessSpec(BaseModel):
-    canvas_size: int = Field(default=1000, ge=256, le=4096)
-    padding: float = Field(default=100.0, ge=0.0)
-    optical_center: bool = True
-    invert: bool = False
-    precision: int = Field(default=2, ge=0, le=5)
-
-
-class LogoSpec(BaseModel):
+class MarkSpec(BaseModel):
     schemaVersion: Literal[1] = 1
     name: str
     concept: str
@@ -179,3 +152,6 @@ class LogoSpec(BaseModel):
     layers: list[LayerSpec] = Field(min_length=1)
     symmetry: SymmetrySpec | None = None
     post: PostProcessSpec = Field(default_factory=PostProcessSpec)
+
+
+LogoSpec = MarkSpec

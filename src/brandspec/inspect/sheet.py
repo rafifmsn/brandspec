@@ -9,7 +9,8 @@ import numpy as np
 from PIL import Image, ImageDraw
 import resvg_py
 
-from .compiler import CompiledLogo, _render_svg_doc
+from ..core.paths import render_svg_doc
+from ..engines.mark.compiler import CompiledMark
 
 
 @dataclass(frozen=True)
@@ -67,9 +68,8 @@ def _count_islands(mask: np.ndarray) -> tuple[int, int]:
     return total, tiny
 
 
-def analyze_compiled(compiled: CompiledLogo) -> QualityMetrics:
+def analyze_compiled(compiled: CompiledMark) -> QualityMetrics:
     """Compute geometric & visual quality metrics directly from rasterized output."""
-    canvas = compiled.spec.post.canvas_size
     pos_img = _rasterize(compiled.svg_markup, 240, background="#ffffff").convert("L")
     arr = np.asarray(pos_img)
     ink = arr < 128
@@ -130,7 +130,7 @@ def analyze_compiled(compiled: CompiledLogo) -> QualityMetrics:
     )
 
 
-def render_inspection_sheet(compiled: CompiledLogo) -> Image.Image:
+def render_inspection_sheet(compiled: CompiledMark) -> Image.Image:
     """Build a 4-panel visual inspection sheet (grid, positive, inverted, scale strip)."""
     canvas_size = compiled.spec.post.canvas_size
     panel_size = 400
@@ -140,7 +140,7 @@ def render_inspection_sheet(compiled: CompiledLogo) -> Image.Image:
     p1 = _rasterize(compiled.overlay_svg_markup, panel_size, background="#ffffff")
     p2 = _rasterize(compiled.svg_markup, panel_size, background="#ffffff")
 
-    inv_svg = _render_svg_doc(
+    inv_svg = render_svg_doc(
         compiled.svg_d,
         canvas_size,
         fill="#ffffff",

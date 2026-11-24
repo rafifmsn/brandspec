@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import math
+from typing import Literal
 
-from .schema import GridSpec, Point2D
+from pydantic import BaseModel, Field
 
+Point2D = tuple[float, float]
 COS_30 = math.cos(math.pi / 6.0)
+
+
+class GridSpec(BaseModel):
+    type: Literal["square", "isometric", "polar"] = "square"
+    divisions: int = Field(default=8, ge=2, le=32)
 
 
 def grid_to_xy(pt: Point2D, grid: GridSpec, unit: float) -> Point2D:
