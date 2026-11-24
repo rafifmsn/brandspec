@@ -175,29 +175,52 @@ def _compute_optical_nudge(svg_d: str, canvas_size: int, max_nudge: float) -> tu
     return (dx, dy)
 
 
+def _merge_parts(parts: dict[str, pathops.Path]) -> pathops.Path:
+    builder = pathops.OpBuilder()
+    for part in parts.values():
+        builder.add(part, pathops.PathOp.UNION)
+    out = builder.resolve()
+    out.convertConicsToQuads(0.05)
+    return pathops.simplify(out, fix_winding=True)
+
+
 def compile_spec(spec: LogoSpec) -> CompiledLogo:
     """Compile a validated LogoSpec into normalized vector paths and SVGs."""
-    acc: pathops.Path | None = None
+    parts: dict[str, pathops.Path] = {}
     for layer in spec.layers:
         layer_path = _compile_layer(layer, spec)
-        if acc is None:
-            acc = layer_path
+        if not parts:
+            parts[layer.id] = layer_path
             continue
 
         if layer.op == "unite":
             if layer.halo > 0.0:
                 carve = dilate_path(layer_path, layer.halo * spec.unit)
-                acc = pathops.op(acc, carve, pathops.PathOp.DIFFERENCE)
-            acc = pathops.op(acc, layer_path, pathops.PathOp.UNION)
+                targets = list(parts.keys()) if layer.halo_targets is None else layer.halo_targets
+                for tid in targets:
+                    if tid not in parts:
+                        raise ValueError(
+                            f"Unknown halo_target '{tid}' in layer '{layer.id}'"
+                        )
+                    parts[tid] = pathops.op(parts[tid], carve, pathops.PathOp.DIFFERENCE)
+            parts[layer.id] = layer_path
         elif layer.op == "subtract":
             target = dilate_path(layer_path, layer.halo * spec.unit) if layer.halo > 0.0 else layer_path
-            acc = pathops.op(acc, target, pathops.PathOp.DIFFERENCE)
+            targets = list(parts.keys()) if layer.halo_targets is None else layer.halo_targets
+            for tid in targets:
+                if tid not in parts:
+                    raise ValueError(
+                        f"Unknown halo_target '{tid}' in layer '{layer.id}'"
+                    )
+                parts[tid] = pathops.op(parts[tid], target, pathops.PathOp.DIFFERENCE)
         elif layer.op == "intersect":
-            acc = pathops.op(acc, layer_path, pathops.PathOp.INTERSECTION)
+            merged = _merge_parts(parts)
+            parts = {"__acc__": pathops.op(merged, layer_path, pathops.PathOp.INTERSECTION)}
         elif layer.op == "xor":
-            acc = pathops.op(acc, layer_path, pathops.PathOp.XOR)
+            merged = _merge_parts(parts)
+            parts = {"__acc__": pathops.op(merged, layer_path, pathops.PathOp.XOR)}
 
-    assert acc is not None
+    acc = _merge_parts(parts)
     acc = apply_symmetry(acc, spec.symmetry, spec.unit)
 
     if spec.post.invert:

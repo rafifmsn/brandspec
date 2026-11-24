@@ -42,23 +42,11 @@
       "id": "top-overpass",
       "op": "unite",
       "halo": 0.38,
+      "halo_targets": ["right-link"],
       "shapes": [
         {
           "type": "grid_path",
-          "points": [[-1.7, -1.4], [0.1, -1.4]],
-          "closed": false,
-          "width": 0.9,
-          "cap": "butt"
-        }
-      ]
-    },
-    {
-      "id": "heal-left-seam",
-      "op": "unite",
-      "shapes": [
-        {
-          "type": "grid_path",
-          "points": [[-2.4, -1.4], [-1.5, -1.4]],
+          "points": [[-1.8, -1.4], [0.2, -1.4]],
           "closed": false,
           "width": 0.9,
           "cap": "butt"

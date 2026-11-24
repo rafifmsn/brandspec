@@ -11,13 +11,13 @@ Never write raw SVG `<path d="...">` coordinates by hand. Always express the con
 
 ## Available CLI Commands
 
-Run from the `logo-mod` project directory (or globally if installed via `uv tool install`):
+Run `logo-mod` directly (or `uv run logo-mod` inside the `logo-mod` project):
 
 ```bash
-uv run logo-mod archetypes
-uv run logo-mod init <archetype> --out <path/to/spec.json>
-uv run logo-mod build <path/to/spec.json> --out-dir <path/to/out>
-uv run logo-mod check <path/to/spec.json>
+logo-mod archetypes
+logo-mod init <archetype> --out <path/to/spec.json>
+logo-mod build <path/to/spec.json> --out-dir <path/to/out>
+logo-mod check <path/to/spec.json>
 ```
 
 Each `build` outputs four deterministic artifacts:
@@ -29,7 +29,7 @@ Each `build` outputs four deterministic artifacts:
 ## Modernist Construction Rules
 
 1. **One unit governs everything**: Express stroke widths, gaps, radii, and clearances as clean multiples of the grid unit (`1.0`, `0.5`, `0.4`).
-2. **Use `halo` for interlocking gaps**: Instead of manually calculating negative cutout bars where ribbons cross, put the crossing ribbon in its own `unite` layer with `"halo": 0.35` to `"halo": 0.5`. The compiler carves a uniform clearance gap around every curve automatically.
+2. **Use `halo` and `halo_targets` for interlocking gaps**: Instead of manually calculating negative cutout bars where ribbons cross, put the crossing ribbon in its own `unite` layer with `"halo": 0.35` to `"halo": 0.5`. When adding an overpass that re-crosses an earlier band without cutting itself, set `"halo_targets": ["<crossing-layer-id>"]` so `halo` carves only the target layer and requires zero seam-healing patches.
 3. **Use `grid_path` with `corner_radius` for continuous forms**: Prefer a single `grid_path` polyline with `corner_radius` over separate bars and arcs so tangents and stroke weights remain seamless.
 4. **Use `clip_to` for optical effects**: Combine `line_screen` or `halftone_grid` with `clip_to: [circle | polygon | rect]` to produce kinetic *Logo Modernism* marks cleanly.
 5. **Preserve 24px legibility**: Keep minimum stripe widths and `halo` gaps large enough (`>= 0.3` unit) so negative space does not collapse at 24px.

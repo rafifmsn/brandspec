@@ -155,6 +155,7 @@ class LayerSpec(BaseModel):
     id: str
     op: Literal["unite", "subtract", "intersect", "xor"] = "unite"
     halo: float = Field(default=0.0, ge=0.0)
+    halo_targets: list[str] | None = None
     shapes: list[ShapeSpec] = Field(min_length=1)
     clip_to: list[ShapeSpec] | None = None
     symmetry: SymmetrySpec | None = None

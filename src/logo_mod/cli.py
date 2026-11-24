@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from importlib import resources
 import json
 import sys
 from pathlib import Path
@@ -15,14 +16,12 @@ from .schema import LogoSpec
 
 
 def _find_archetypes_dir() -> Path:
-    here = Path(__file__).resolve()
-    candidates = [
-        here.parents[2] / "archetypes",
-        Path.cwd() / "archetypes",
-    ]
-    for c in candidates:
-        if c.is_dir():
-            return c
+    pkg_dir = Path(str(resources.files("logo_mod").joinpath("archetypes")))
+    if pkg_dir.is_dir():
+        return pkg_dir
+    cwd_dir = Path.cwd() / "archetypes"
+    if cwd_dir.is_dir():
+        return cwd_dir
     raise FileNotFoundError("Could not locate archetypes directory.")
 
 
