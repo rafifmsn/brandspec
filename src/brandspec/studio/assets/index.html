@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brandspec</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="/assets/studio.css" />
+  </head>
+  <body>
+    <div id="studio-shell" class="studio-shell">
+      <header class="topbar">
+        <div class="topbar-left">
+          <img class="brand-logo" src="/assets/logo.svg" alt="Brandspec" width="28" height="28" />
+          <nav class="breadcrumbs" aria-label="Workspace path">
+            <span class="crumb-strong">Brandspec</span>
+            <span class="crumb-sep">/</span>
+            <span id="session-dir" class="crumb-muted"></span>
+          </nav>
+        </div>
+
+        <div class="topbar-right">
+          <div id="mode-tabs" class="segmented" hidden>
+            <button type="button" class="seg-btn is-active" data-tab="review">Review</button>
+            <button type="button" class="seg-btn" data-tab="mockups">Mockups</button>
+          </div>
+        </div>
+      </header>
+
+      <div id="review-workspace" class="workspace">
+        <aside class="tool-rail" aria-label="Sidebar and workspace controls">
+          <button type="button" class="rail-btn is-active" id="rail-candidates" title="Candidates panel" data-sidebar="candidates">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3" />
+              <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3" />
+              <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3" />
+              <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+          </button>
+          <button type="button" class="rail-btn" id="rail-history" title="Round history log" data-sidebar="history">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.3" />
+              <path d="M8 4.8V8.2L10.3 9.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span id="history-pending-dot" class="rail-dot" hidden aria-label="Pending agent response"></span>
+          </button>
+          <div class="rail-spacer"></div>
+          <button type="button" class="rail-btn" id="rail-toggle-left" title="Toggle left panel">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3" />
+              <path d="M6 2.5V13.5" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+          </button>
+          <button type="button" class="rail-btn" id="rail-fullscreen" title="Fullscreen canvas (hide sidebars)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2.5 6V2.5H6M10 2.5H13.5V6M13.5 10V13.5H10M6 13.5H2.5V10" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+          </button>
+        </aside>
+
+        <aside id="left-sidebar" class="left-sidebar">
+          <div class="sidebar-head">
+            <span id="sidebar-heading" class="sidebar-title">Candidates</span>
+          </div>
+
+          <div id="candidates-panel-body" class="candidate-scroll"></div>
+
+          <div id="history-panel-body" class="candidate-scroll" hidden>
+            <div id="history-log-list" class="history-log-list"></div>
+          </div>
+        </aside>
+
+        <main class="canvas-stage">
+          <div class="floating-toolbar" role="toolbar" aria-label="Stage view controls">
+            <div class="tool-seg" role="group" aria-label="Render mode">
+              <button type="button" class="tool-btn is-active" data-view="positive">Positive</button>
+              <button type="button" class="tool-btn" data-view="inverted">Inverted</button>
+              <button type="button" class="tool-btn" data-view="grid">Grid</button>
+              <button type="button" class="tool-btn" data-view="sheet">Sheet</button>
+            </div>
+            <span class="tool-divider"></span>
+            <div class="tool-seg" role="group" aria-label="Scale test">
+              <button type="button" class="tool-btn is-active" data-scale="fit">Fit</button>
+              <button type="button" class="tool-btn tabular" data-scale="96">96px</button>
+              <button type="button" class="tool-btn tabular" data-scale="48">48px</button>
+              <button type="button" class="tool-btn tabular" data-scale="24">24px</button>
+            </div>
+            <span class="tool-divider"></span>
+            <div class="zoom-group">
+              <button type="button" class="tool-btn" id="zoom-out" aria-label="Zoom out">-</button>
+              <button type="button" class="tool-btn zoom-label tabular" id="zoom-reset" title="Reset zoom to 100%">100%</button>
+              <button type="button" class="tool-btn" id="zoom-in" aria-label="Zoom in">+</button>
+            </div>
+            <span class="tool-divider"></span>
+            <label class="hex-box" for="surface-hex" title="Custom background hex">
+              <span id="hex-swatch" class="hex-swatch"></span>
+              <input id="surface-hex" type="text" value="" placeholder="#ffffff" maxlength="7" />
+            </label>
+          </div>
+
+          <div id="canvas-viewport" class="canvas-viewport">
+            <div id="artboard-wrap" class="artboard-wrap">
+              <div id="canvas-frame" class="canvas-frame">
+                <img id="mark-image" alt="Compiled brand mark" draggable="false" />
+                <div id="pin-layer" class="pin-layer"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="hover-coords" class="hover-coords tabular" hidden>0.00, 0.00</div>
+          <div id="metrics-dock" class="telemetry-dock"></div>
+        </main>
+
+        <aside id="right-inspector" class="inspector">
+          <div class="inspector-section">
+            <div class="inspector-head">
+              <h1 id="candidate-title">Mark Review</h1>
+              <p id="candidate-subtitle" class="inspector-sub"></p>
+            </div>
+          </div>
+
+          <div class="inspector-section">
+            <div class="section-label-row">
+              <span class="section-label">Decision</span>
+            </div>
+            <div class="decision-grid" role="group" aria-label="Review decision">
+              <button type="button" class="decision-btn" data-status="approve">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M2.8 8.4L6.2 11.8L13.2 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>Approve</span>
+              </button>
+              <button type="button" class="decision-btn is-active" data-status="revise">
+                <svg width="6" height="12" viewBox="0 0 6 14" fill="none" aria-hidden="true">
+                  <path d="M3 2V8.2M3 11.4V11.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+                <span>Revise</span>
+              </button>
+              <button type="button" class="decision-btn" data-status="reject">
+                <svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path d="M3 3L11 11M11 3L3 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+                <span>Reject</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="inspector-section inspector-pins">
+            <div class="section-label-row">
+              <span class="section-label">Pin Comments <span id="pin-count" class="tabular">(0)</span></span>
+              <button type="button" id="clear-pins" class="text-btn" hidden>Clear all</button>
+            </div>
+            <div id="pin-list" class="pin-list"></div>
+          </div>
+
+          <div class="inspector-section">
+            <label class="section-label" for="review-summary">Review Summary</label>
+            <textarea id="review-summary" rows="3" placeholder="Write targeted revision or sign-off notes..."></textarea>
+            <button type="button" id="submit-review" class="btn-primary">Submit Review</button>
+            <div id="submit-error" class="submit-error" hidden></div>
+          </div>
+
+          <div class="inspector-accordions">
+            <details id="warnings-accordion" class="accordion" hidden>
+              <summary>
+                <span>Audit Warnings</span>
+                <span id="warnings-count" class="tabular">0</span>
+              </summary>
+              <div id="warnings-list" class="accordion-body"></div>
+            </details>
+          </div>
+        </aside>
+      </div>
+
+      <section id="mockups-panel" class="mockups-workspace" hidden>
+        <div class="mockups-inner">
+          <div class="mockups-header">
+            <h2>Contextual Mockups</h2>
+            <p>Live HTML/CSS previews rendered from tokens and exported kit assets</p>
+          </div>
+          <div id="mockups-grid" class="mockups-grid"></div>
+        </div>
+      </section>
+    </div>
+
+    <script src="/assets/studio.js" defer></script>
+  </body>
+</html>

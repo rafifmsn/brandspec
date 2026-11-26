@@ -10,8 +10,8 @@ import pathops
 from PIL import Image
 import resvg_py
 
-from ...core.grid import grid_overlay_svg
-from ...core.paths import apply_symmetry, dilate_path, path_to_svg_d, render_svg_doc
+from ...core.grid import GridSpec, grid_overlay_svg
+from ...core.paths import SymmetrySpec, apply_symmetry, dilate_path, path_to_svg_d, render_svg_doc
 from .geometry import build_shape
 from .schema import LayerSpec, MarkSpec
 
@@ -30,22 +30,22 @@ class CompiledMark:
 CompiledLogo = CompiledMark
 
 
-def _union_shapes(shapes: list, spec: MarkSpec) -> pathops.Path:
+def _union_shapes(shapes: list, grid: GridSpec, unit: float) -> pathops.Path:
     builder = pathops.OpBuilder()
     for s in shapes:
-        builder.add(build_shape(s, spec.grid, spec.unit), pathops.PathOp.UNION)
+        builder.add(build_shape(s, grid, unit), pathops.PathOp.UNION)
     out = builder.resolve()
     out.convertConicsToQuads(0.05)
     return pathops.simplify(out, fix_winding=True)
 
 
-def _compile_layer(layer: LayerSpec, spec: MarkSpec) -> pathops.Path:
-    layer_path = _union_shapes(layer.shapes, spec)
+def _compile_layer(layer: LayerSpec, grid: GridSpec, unit: float) -> pathops.Path:
+    layer_path = _union_shapes(layer.shapes, grid, unit)
     if layer.clip_to:
-        clip_path = _union_shapes(layer.clip_to, spec)
+        clip_path = _union_shapes(layer.clip_to, grid, unit)
         layer_path = pathops.op(layer_path, clip_path, pathops.PathOp.INTERSECTION)
     if layer.symmetry is not None:
-        layer_path = apply_symmetry(layer_path, layer.symmetry, spec.unit)
+        layer_path = apply_symmetry(layer_path, layer.symmetry, unit)
     layer_path.convertConicsToQuads(0.05)
     return pathops.simplify(layer_path, fix_winding=True)
 
@@ -57,6 +57,67 @@ def _merge_parts(parts: dict[str, pathops.Path]) -> pathops.Path:
     out = builder.resolve()
     out.convertConicsToQuads(0.05)
     return pathops.simplify(out, fix_winding=True)
+
+
+def compile_layers(
+    layers: list[LayerSpec],
+    grid: GridSpec,
+    unit: float,
+    symmetry: SymmetrySpec | None = None,
+) -> pathops.Path:
+    """Compile boolean layers on a grid into a simplified design-space path."""
+    parts: dict[str, pathops.Path] = {}
+    for layer in layers:
+        layer_path = _compile_layer(layer, grid, unit)
+        if not parts:
+            parts[layer.id] = layer_path
+            continue
+
+        if layer.op == "unite":
+            if layer.halo > 0.0:
+                carve = dilate_path(
+                    layer_path,
+                    layer.halo * unit,
+                    join=layer.halo_join,
+                    cap=layer.halo_cap,
+                )
+                targets = list(parts.keys()) if layer.halo_targets is None else layer.halo_targets
+                for tid in targets:
+                    if tid not in parts:
+                        raise ValueError(
+                            f"Unknown halo_target '{tid}' in layer '{layer.id}'"
+                        )
+                    parts[tid] = pathops.op(parts[tid], carve, pathops.PathOp.DIFFERENCE)
+            parts[layer.id] = layer_path
+        elif layer.op == "subtract":
+            target = (
+                dilate_path(
+                    layer_path,
+                    layer.halo * unit,
+                    join=layer.halo_join,
+                    cap=layer.halo_cap,
+                )
+                if layer.halo > 0.0
+                else layer_path
+            )
+            targets = list(parts.keys()) if layer.halo_targets is None else layer.halo_targets
+            for tid in targets:
+                if tid not in parts:
+                    raise ValueError(
+                        f"Unknown halo_target '{tid}' in layer '{layer.id}'"
+                    )
+                parts[tid] = pathops.op(parts[tid], target, pathops.PathOp.DIFFERENCE)
+        elif layer.op == "intersect":
+            merged = _merge_parts(parts)
+            parts = {"__acc__": pathops.op(merged, layer_path, pathops.PathOp.INTERSECTION)}
+        elif layer.op == "xor":
+            merged = _merge_parts(parts)
+            parts = {"__acc__": pathops.op(merged, layer_path, pathops.PathOp.XOR)}
+
+    acc = _merge_parts(parts)
+    acc = apply_symmetry(acc, symmetry, unit)
+    acc.convertConicsToQuads(0.05)
+    return pathops.simplify(acc, fix_winding=True)
 
 
 def _compute_optical_nudge(svg_d: str, canvas_size: int, max_nudge: float) -> tuple[float, float]:
@@ -76,50 +137,11 @@ def _compute_optical_nudge(svg_d: str, canvas_size: int, max_nudge: float) -> tu
     return (dx, dy)
 
 
-def compile_spec(spec: MarkSpec) -> CompiledMark:
-    """Compile a validated MarkSpec into normalized vector paths and SVGs."""
-    parts: dict[str, pathops.Path] = {}
-    for layer in spec.layers:
-        layer_path = _compile_layer(layer, spec)
-        if not parts:
-            parts[layer.id] = layer_path
-            continue
+def compile_mark_design_path(spec: MarkSpec) -> pathops.Path:
+    """Compile a MarkSpec into its un-normalized centered design-space path."""
+    acc = compile_layers(spec.layers, spec.grid, spec.unit, spec.symmetry)
 
-        if layer.op == "unite":
-            if layer.halo > 0.0:
-                carve = dilate_path(layer_path, layer.halo * spec.unit)
-                targets = list(parts.keys()) if layer.halo_targets is None else layer.halo_targets
-                for tid in targets:
-                    if tid not in parts:
-                        raise ValueError(
-                            f"Unknown halo_target '{tid}' in layer '{layer.id}'"
-                        )
-                    parts[tid] = pathops.op(parts[tid], carve, pathops.PathOp.DIFFERENCE)
-            parts[layer.id] = layer_path
-        elif layer.op == "subtract":
-            target = (
-                dilate_path(layer_path, layer.halo * spec.unit)
-                if layer.halo > 0.0
-                else layer_path
-            )
-            targets = list(parts.keys()) if layer.halo_targets is None else layer.halo_targets
-            for tid in targets:
-                if tid not in parts:
-                    raise ValueError(
-                        f"Unknown halo_target '{tid}' in layer '{layer.id}'"
-                    )
-                parts[tid] = pathops.op(parts[tid], target, pathops.PathOp.DIFFERENCE)
-        elif layer.op == "intersect":
-            merged = _merge_parts(parts)
-            parts = {"__acc__": pathops.op(merged, layer_path, pathops.PathOp.INTERSECTION)}
-        elif layer.op == "xor":
-            merged = _merge_parts(parts)
-            parts = {"__acc__": pathops.op(merged, layer_path, pathops.PathOp.XOR)}
-
-    acc = _merge_parts(parts)
-    acc = apply_symmetry(acc, spec.symmetry, spec.unit)
-
-    if spec.post.invert:
+    if spec.post.invert and acc.bounds is not None:
         x0, y0, x1, y1 = acc.bounds
         margin = spec.unit
         frame = pathops.Path()
@@ -129,14 +151,18 @@ def compile_spec(spec: MarkSpec) -> CompiledMark:
         frame.lineTo(x0 - margin, y1 + margin)
         frame.close()
         acc = pathops.op(frame, acc, pathops.PathOp.DIFFERENCE)
+        acc.convertConicsToQuads(0.05)
+        acc = pathops.simplify(acc, fix_winding=True)
 
-    acc.convertConicsToQuads(0.05)
-    acc = pathops.simplify(acc, fix_winding=True)
-
-    bounds = acc.bounds
-    if bounds is None:
+    if acc.bounds is None or len(list(acc.contours)) == 0:
         raise ValueError("Compiled geometry is empty after boolean operations.")
-    min_x, min_y, max_x, max_y = bounds
+    return acc
+
+
+def compile_spec(spec: MarkSpec) -> CompiledMark:
+    """Compile a validated MarkSpec into normalized vector paths and SVGs."""
+    acc = compile_mark_design_path(spec)
+    min_x, min_y, max_x, max_y = acc.bounds
     w = max(max_x - min_x, 1e-6)
     h = max(max_y - min_y, 1e-6)
 

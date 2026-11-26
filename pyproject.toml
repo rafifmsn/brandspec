@@ -29,6 +29,7 @@ classifiers = [
     "Topic :: Multimedia :: Graphics :: Editors :: Vector-Based",
 ]
 dependencies = [
+    "fontTools>=4.50",
     "numpy>=1.26",
     "pillow>=10.0",
     "pydantic>=2.7",
@@ -55,3 +56,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/brandspec"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"skills/brandspec/SKILL.md" = "brandspec/skills/SKILL.md"
