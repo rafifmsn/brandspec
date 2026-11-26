@@ -41,6 +41,7 @@ ALLOWED_KIT_FILES = {
 }
 VALID_STATUSES = {"approve", "revise", "reject"}
 ROUND_RE = re.compile(r"^review\.round-(\d+)\.json$")
+ROUND_DIR_RE = re.compile(r"^round-(\d+)$")
 
 
 def _load_asset(filename: str) -> tuple[bytes, str]:
@@ -84,7 +85,11 @@ def _is_within(base: Path, target: Path) -> bool:
         return False
 
 
-def discover_candidates(root_dir: Path) -> list[dict[str, Any]]:
+def discover_candidates(
+    root_dir: Path,
+    id_prefix: str = "",
+    url_base: str = "/api/candidates",
+) -> list[dict[str, Any]]:
     """Discover single or multi-candidate compiled directories inside root_dir."""
     root = root_dir.resolve()
     dirs: list[tuple[str, Path]] = []
@@ -92,11 +97,12 @@ def discover_candidates(root_dir: Path) -> list[dict[str, Any]]:
         dirs.append(("default", root))
     else:
         for child in sorted(root.iterdir(), key=lambda p: p.name):
-            if child.is_dir() and (child / "logo.svg").is_file():
+            if child.is_dir() and child.name != "rounds" and (child / "logo.svg").is_file():
                 dirs.append((child.name, child))
 
     candidates: list[dict[str, Any]] = []
-    for cid, cdir in dirs:
+    for raw_cid, cdir in dirs:
+        cid = f"{id_prefix}{raw_cid}"
         meta = _read_json_if_exists(cdir / "meta.json")
         metrics = _read_json_if_exists(cdir / "metrics.json")
         spec = _read_json_if_exists(cdir / "spec.json")
@@ -109,18 +115,19 @@ def discover_candidates(root_dir: Path) -> list[dict[str, Any]]:
         candidates.append(
             {
                 "id": cid,
+                "label": raw_cid,
                 "meta": meta,
                 "metrics": metrics,
                 "spec": spec,
                 "files": {
-                    "logo_svg": f"/api/candidates/{cid}/logo.svg",
+                    "logo_svg": f"{url_base}/{raw_cid}/logo.svg",
                     "sheet_png": (
-                        f"/api/candidates/{cid}/sheet.png"
+                        f"{url_base}/{raw_cid}/sheet.png"
                         if (cdir / "sheet.png").is_file()
                         else None
                     ),
                     "overlay_svg": (
-                        f"/api/candidates/{cid}/overlay.svg" if has_overlay else None
+                        f"{url_base}/{raw_cid}/overlay.svg" if has_overlay else None
                     ),
                 },
             }
@@ -134,9 +141,48 @@ def _candidate_dir_map(root_dir: Path) -> dict[str, Path]:
         return {"default": root}
     mapping: dict[str, Path] = {}
     for child in sorted(root.iterdir(), key=lambda p: p.name):
-        if child.is_dir() and (child / "logo.svg").is_file():
+        if child.is_dir() and child.name != "rounds" and (child / "logo.svg").is_file():
             mapping[child.name] = child
     return mapping
+
+
+def _snapshot_round_candidates(root_dir: Path, round_num: int) -> None:
+    """Snapshot current candidate artifacts into rounds/round-<n>/ for branching."""
+    cdirs = _candidate_dir_map(root_dir)
+    if not cdirs:
+        return
+    round_dir = root_dir / "rounds" / f"round-{round_num}"
+    for cid, src_dir in cdirs.items():
+        dst_dir = round_dir / cid
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for fname in ALLOWED_CANDIDATE_FILES:
+            src_file = src_dir / fname
+            if src_file.is_file():
+                (dst_dir / fname).write_bytes(src_file.read_bytes())
+
+
+def discover_round_groups(root_dir: Path) -> list[dict[str, Any]]:
+    """Return archived prior round candidate groups sorted newest-first."""
+    rounds_root = root_dir / "rounds"
+    if not rounds_root.is_dir():
+        return []
+    groups: list[tuple[int, dict[str, Any]]] = []
+    for child in rounds_root.iterdir():
+        if not child.is_dir():
+            continue
+        match = ROUND_DIR_RE.match(child.name)
+        if not match:
+            continue
+        rnum = int(match.group(1))
+        cands = discover_candidates(
+            child,
+            id_prefix=f"round-{rnum}/",
+            url_base=f"/api/rounds/round-{rnum}",
+        )
+        if cands:
+            groups.append((rnum, {"round": rnum, "candidates": cands}))
+    groups.sort(key=lambda item: item[0], reverse=True)
+    return [g for _, g in groups]
 
 
 def _build_overlay_svg(cdir: Path) -> str | None:
@@ -230,6 +276,7 @@ def _archive_and_write_review(root_dir: Path, payload: dict[str, Any]) -> dict[s
     tmp_path = root_dir / ".review.json.tmp"
     tmp_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     tmp_path.replace(review_path)
+    _snapshot_round_candidates(root_dir, next_round)
     return record
 
 
@@ -272,6 +319,7 @@ class StudioState:
             return {
                 "dir": str(self.root_dir),
                 "candidates": candidates,
+                "round_groups": discover_round_groups(self.root_dir),
                 "variants": variants if isinstance(variants, list) else None,
                 "tokens": tokens if isinstance(tokens, dict) else None,
                 "kit": kit_files if kit_files else None,
@@ -365,6 +413,56 @@ class StudioHandler(BaseHTTPRequestHandler):
                     self._send_json(HTTPStatus.NOT_FOUND, {"error": "Overlay unavailable"})
                     return
                 self._send_bytes(HTTPStatus.OK, "image/svg+xml; charset=utf-8", overlay.encode("utf-8"))
+                return
+            if not target.is_file():
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "File not found"})
+                return
+            mime, _ = mimetypes.guess_type(target.name)
+            if target.suffix == ".svg":
+                mime = "image/svg+xml; charset=utf-8"
+            elif target.suffix == ".json":
+                mime = "application/json; charset=utf-8"
+            elif mime is None:
+                mime = "application/octet-stream"
+            self._send_bytes(HTTPStatus.OK, mime, target.read_bytes())
+            return
+
+        if req_path.startswith("/api/rounds/"):
+            rest = req_path[len("/api/rounds/") :]
+            if "\\" in rest or ".." in rest.split("/"):
+                self._send_json(HTTPStatus.FORBIDDEN, {"error": "Path traversal rejected"})
+                return
+            parts = rest.split("/")
+            if len(parts) != 3 or not all(parts):
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "Invalid round path"})
+                return
+            round_id, cid, filename = parts
+            if not ROUND_DIR_RE.match(round_id) or filename not in ALLOWED_CANDIDATE_FILES:
+                self._send_json(HTTPStatus.FORBIDDEN, {"error": "Round artifact not permitted"})
+                return
+            round_dir = (self.state.root_dir / "rounds" / round_id).resolve()
+            if not _is_within(self.state.root_dir, round_dir) or not round_dir.is_dir():
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown round"})
+                return
+            cdirs = _candidate_dir_map(round_dir)
+            if cid not in cdirs:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown round candidate"})
+                return
+            cdir = cdirs[cid]
+            target = (cdir / filename).resolve()
+            if not _is_within(self.state.root_dir, target) or not _is_within(cdir, target):
+                self._send_json(HTTPStatus.FORBIDDEN, {"error": "Path outside round root"})
+                return
+            if filename == "overlay.svg" and not target.is_file():
+                overlay = _build_overlay_svg(cdir)
+                if overlay is None:
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": "Overlay unavailable"})
+                    return
+                self._send_bytes(
+                    HTTPStatus.OK,
+                    "image/svg+xml; charset=utf-8",
+                    overlay.encode("utf-8"),
+                )
                 return
             if not target.is_file():
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "File not found"})

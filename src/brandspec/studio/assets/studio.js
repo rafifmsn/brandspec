@@ -6,6 +6,7 @@
     session: null,
     activeId: null,
     tab: "review",
+    sidebarMode: "candidates",
     view: "positive",
     scale: "fit",
     zoom: 1.0,
@@ -22,22 +23,21 @@
     studioShell: document.getElementById("studio-shell"),
     sessionDir: document.getElementById("session-dir"),
     roundPill: document.getElementById("round-pill"),
-    roundGroupLabel: document.getElementById("round-group-label"),
     modeTabs: document.getElementById("mode-tabs"),
     reviewWorkspace: document.getElementById("review-workspace"),
     mockupsPanel: document.getElementById("mockups-panel"),
     mockupsGrid: document.getElementById("mockups-grid"),
-    sidebarCount: document.getElementById("sidebar-count"),
-    candidateGrid: document.getElementById("candidate-grid"),
-    sidebarHistoryGroup: document.getElementById("sidebar-history-group"),
-    sidebarHistoryList: document.getElementById("sidebar-history-list"),
+    sidebarHeading: document.getElementById("sidebar-heading"),
+    candidatesPanelBody: document.getElementById("candidates-panel-body"),
+    historyPanelBody: document.getElementById("history-panel-body"),
+    historyLogList: document.getElementById("history-log-list"),
     artboardWrap: document.getElementById("artboard-wrap"),
     canvasFrame: document.getElementById("canvas-frame"),
     markImage: document.getElementById("mark-image"),
     pinLayer: document.getElementById("pin-layer"),
     hoverCoords: document.getElementById("hover-coords"),
     metricsDock: document.getElementById("metrics-dock"),
-    zoomReadout: document.getElementById("zoom-readout"),
+    zoomReset: document.getElementById("zoom-reset"),
     surfaceHex: document.getElementById("surface-hex"),
     hexSwatch: document.getElementById("hex-swatch"),
     candidateTitle: document.getElementById("candidate-title"),
@@ -51,11 +51,7 @@
     warningsAccordion: document.getElementById("warnings-accordion"),
     warningsCount: document.getElementById("warnings-count"),
     warningsList: document.getElementById("warnings-list"),
-    historyAccordion: document.getElementById("history-accordion"),
-    historyCount: document.getElementById("history-count"),
-    historyList: document.getElementById("history-list"),
     railToggleLeft: document.getElementById("rail-toggle-left"),
-    railFit: document.getElementById("rail-fit"),
     railFullscreen: document.getElementById("rail-fullscreen"),
     zoomIn: document.getElementById("zoom-in"),
     zoomOut: document.getElementById("zoom-out"),
@@ -87,7 +83,7 @@
     svg.setAttribute("fill", "none");
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("stroke", "currentColor");
-    path.setAttribute("stroke-width", "1.6");
+    path.setAttribute("stroke-width", "1.7");
     path.setAttribute("stroke-linecap", "round");
     path.setAttribute("stroke-linejoin", "round");
     if (status === "approve") {
@@ -101,12 +97,23 @@
     return svg;
   }
 
+  function allSelectableCandidates() {
+    if (!state.session) return [];
+    const list = [...(state.session.candidates || [])];
+    if (Array.isArray(state.session.round_groups)) {
+      state.session.round_groups.forEach((group) => {
+        if (Array.isArray(group.candidates)) {
+          list.push(...group.candidates);
+        }
+      });
+    }
+    return list;
+  }
+
   function activeCandidate() {
-    if (!state.session || !state.session.candidates.length) return null;
-    return (
-      state.session.candidates.find((c) => c.id === state.activeId) ||
-      state.session.candidates[0]
-    );
+    const all = allSelectableCandidates();
+    if (!all.length) return null;
+    return all.find((c) => c.id === state.activeId) || all[0];
   }
 
   function gridToCanvasPercent(xGrid, yGrid, meta) {
@@ -183,65 +190,145 @@
     return rounds;
   }
 
-  function renderCandidateGrid() {
-    const candidates = state.session ? state.session.candidates : [];
-    const roundNum = (state.session && state.session.round) || 1;
-    el.sidebarCount.textContent = String(candidates.length);
-    el.roundPill.textContent = `Round ${roundNum}`;
-    el.roundGroupLabel.textContent = `Round ${roundNum}`;
-    el.candidateGrid.innerHTML = "";
+  function renderCandidateCard(cand) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "candidate-card" + (cand.id === state.activeId ? " is-selected" : "");
 
-    candidates.forEach((cand) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "candidate-card" + (cand.id === state.activeId ? " is-selected" : "");
+    const thumbBox = document.createElement("div");
+    thumbBox.className = "candidate-thumb-box";
+    const img = document.createElement("img");
+    img.src = cand.files.logo_svg;
+    img.alt = cand.label || cand.id;
+    thumbBox.appendChild(img);
 
-      const thumbBox = document.createElement("div");
-      thumbBox.className = "candidate-thumb-box";
-      const img = document.createElement("img");
-      img.src = cand.files.logo_svg;
-      img.alt = cand.id;
-      thumbBox.appendChild(img);
+    const metaRow = document.createElement("div");
+    metaRow.className = "candidate-card-meta tabular";
+    const idSpan = document.createElement("span");
+    idSpan.textContent = cand.label || cand.id;
+    const statusSpan = document.createElement("span");
+    statusSpan.textContent = cand.metrics && cand.metrics.passed ? "PASS" : "WARN";
+    metaRow.appendChild(idSpan);
+    metaRow.appendChild(statusSpan);
 
-      const metaRow = document.createElement("div");
-      metaRow.className = "candidate-card-meta tabular";
-      const idSpan = document.createElement("span");
-      idSpan.textContent = cand.id;
-      const statusSpan = document.createElement("span");
-      statusSpan.textContent = cand.metrics && cand.metrics.passed ? "PASS" : "WARN";
-      metaRow.appendChild(idSpan);
-      metaRow.appendChild(statusSpan);
+    btn.appendChild(thumbBox);
+    btn.appendChild(metaRow);
 
-      btn.appendChild(thumbBox);
-      btn.appendChild(metaRow);
-
-      btn.addEventListener("click", () => {
-        state.activeId = cand.id;
-        renderAll();
-      });
-      el.candidateGrid.appendChild(btn);
+    btn.addEventListener("click", () => {
+      state.activeId = cand.id;
+      renderAll();
     });
+    return btn;
+  }
 
+  function renderLeftSidebar() {
+    const awaiting = isAwaitingAgent();
+    const latestRound =
+      state.session && state.session.latest_review
+        ? Number(state.session.latest_review.round || 1)
+        : 1;
+    const roundNum = awaiting ? latestRound : (state.session && state.session.round) || 1;
     const rounds = collectRounds();
-    el.sidebarHistoryGroup.hidden = rounds.length === 0;
-    el.sidebarHistoryList.innerHTML = "";
-    rounds.forEach(({ item, resolved }) => {
-      const row = document.createElement("div");
-      row.className = "sidebar-history-row" + (resolved ? " is-resolved" : "");
-      const iconWrap = document.createElement("span");
-      iconWrap.className = "history-icon";
-      iconWrap.appendChild(createStatusIcon(item.status));
-      const label = document.createElement("span");
-      label.className = "history-text";
-      const target = item.selected_candidate ? ` · ${item.selected_candidate}` : "";
-      label.textContent = `Round ${item.round}${target}`;
-      const badge = document.createElement("span");
-      badge.textContent = item.status;
-      row.appendChild(iconWrap);
-      row.appendChild(label);
-      row.appendChild(badge);
-      el.sidebarHistoryList.appendChild(row);
+    const isHistory = state.sidebarMode === "history";
+
+    el.sidebarHeading.textContent = isHistory ? "Round History" : "Candidates";
+    el.roundPill.textContent = isHistory ? `${rounds.length} logged` : `Round ${roundNum}`;
+    el.candidatesPanelBody.hidden = isHistory;
+    el.historyPanelBody.hidden = !isHistory;
+
+    document.querySelectorAll("[data-sidebar]").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.sidebar === state.sidebarMode);
     });
+
+    if (!isHistory) {
+      el.candidatesPanelBody.innerHTML = "";
+      const currentCandidates = state.session ? state.session.candidates : [];
+      const currentGroup = document.createElement("div");
+      currentGroup.className = "round-group";
+      const curHead = document.createElement("div");
+      curHead.className = "round-group-head";
+      const curTitle = document.createElement("span");
+      curTitle.className = "round-group-title tabular";
+      curTitle.textContent = `Round ${roundNum}`;
+      curHead.appendChild(curTitle);
+      const curGrid = document.createElement("div");
+      curGrid.className = "candidate-grid";
+      currentCandidates.forEach((cand) => {
+        curGrid.appendChild(renderCandidateCard(cand));
+      });
+      currentGroup.appendChild(curHead);
+      currentGroup.appendChild(curGrid);
+      el.candidatesPanelBody.appendChild(currentGroup);
+
+      const archivedGroups =
+        state.session && Array.isArray(state.session.round_groups)
+          ? state.session.round_groups
+          : [];
+      archivedGroups.forEach((group) => {
+        if (group.round === roundNum) {
+          return;
+        }
+        const wrap = document.createElement("div");
+        wrap.className = "round-group";
+        const head = document.createElement("div");
+        head.className = "round-group-head";
+        const title = document.createElement("span");
+        title.className = "round-group-title tabular";
+        title.textContent = `Round ${group.round}`;
+        head.appendChild(title);
+        const grid = document.createElement("div");
+        grid.className = "candidate-grid";
+        group.candidates.forEach((cand) => {
+          grid.appendChild(renderCandidateCard(cand));
+        });
+        wrap.appendChild(head);
+        wrap.appendChild(grid);
+        el.candidatesPanelBody.appendChild(wrap);
+      });
+      return;
+    }
+
+    el.historyLogList.innerHTML = "";
+    if (rounds.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "history-log-empty";
+      empty.textContent = "No submitted rounds yet.";
+      el.historyLogList.appendChild(empty);
+      return;
+    }
+
+    rounds
+      .slice()
+      .reverse()
+      .forEach(({ item, resolved }) => {
+        const row = document.createElement("div");
+        row.className = "history-row" + (resolved ? " is-resolved" : "");
+
+        const iconWrap = document.createElement("span");
+        iconWrap.className = "history-icon";
+        iconWrap.appendChild(createStatusIcon(item.status));
+
+        const content = document.createElement("div");
+        content.className = "history-content";
+
+        const title = document.createElement("div");
+        title.className = "history-title";
+        const pinsCount = Array.isArray(item.pins) ? item.pins.length : 0;
+        const target = item.selected_candidate ? ` · ${item.selected_candidate}` : "";
+        title.textContent = `Round ${item.round}${target} (${pinsCount} pins)`;
+        content.appendChild(title);
+
+        if (item.summary) {
+          const sum = document.createElement("div");
+          sum.className = "history-summary";
+          sum.textContent = item.summary;
+          content.appendChild(sum);
+        }
+
+        row.appendChild(iconWrap);
+        row.appendChild(content);
+        el.historyLogList.appendChild(row);
+      });
   }
 
   function renderStage() {
@@ -254,13 +341,13 @@
       return;
     }
 
-    const name = (cand.meta && cand.meta.name) || cand.id;
+    const name = (cand.meta && cand.meta.name) || cand.label || cand.id;
     const concept = (cand.meta && cand.meta.concept) || "";
     el.candidateTitle.textContent = `${cand.id}: ${name}`;
     el.candidateSubtitle.textContent = concept;
 
     el.artboardWrap.style.transform = `scale(${state.zoom})`;
-    el.zoomReadout.textContent = `${Math.round(state.zoom * 100)}%`;
+    el.zoomReset.textContent = `${Math.round(state.zoom * 100)}%`;
 
     el.canvasFrame.className = "canvas-frame";
     el.canvasFrame.style.background = "";
@@ -425,30 +512,6 @@
     });
   }
 
-  function renderHistory() {
-    const rounds = collectRounds();
-    el.historyAccordion.hidden = rounds.length === 0;
-    el.historyCount.textContent = String(rounds.length);
-    el.historyList.innerHTML = "";
-    rounds.forEach(({ item, resolved }) => {
-      const row = document.createElement("div");
-      row.className = "history-row" + (resolved ? " is-resolved" : "");
-      const iconWrap = document.createElement("span");
-      iconWrap.className = "history-icon";
-      iconWrap.appendChild(createStatusIcon(item.status));
-
-      const textSpan = document.createElement("span");
-      textSpan.className = "history-text";
-      const pinsCount = Array.isArray(item.pins) ? item.pins.length : 0;
-      const summary = item.summary ? ` - ${item.summary}` : "";
-      textSpan.textContent = `Round ${item.round} (${pinsCount} pins)${summary}`;
-
-      row.appendChild(iconWrap);
-      row.appendChild(textSpan);
-      el.historyList.appendChild(row);
-    });
-  }
-
   function renderReviewControls() {
     const locked = isAwaitingAgent();
     el.reviewSummary.disabled = locked;
@@ -492,7 +555,7 @@
       tabBar.appendChild(fav);
     }
     const tabText = document.createElement("span");
-    tabText.textContent = tokens.name || "BrandSPEC";
+    tabText.textContent = tokens.name || "Brandspec";
     tabBar.appendChild(tabText);
 
     const navbar = document.createElement("div");
@@ -562,17 +625,13 @@
     document.querySelectorAll("[data-view]").forEach((btn) => {
       btn.classList.toggle("is-active", btn.dataset.view === state.view);
     });
-    document.querySelectorAll("[data-rail-view]").forEach((btn) => {
-      btn.classList.toggle("is-active", btn.dataset.railView === state.view);
-    });
   }
 
   function renderAll(focusNewInput = false) {
     syncViewButtons();
-    renderCandidateGrid();
+    renderLeftSidebar();
     renderStage();
     renderPinList(focusNewInput);
-    renderHistory();
     renderReviewControls();
     renderMockups();
   }
@@ -603,9 +662,23 @@
     });
   });
 
-  document.querySelectorAll("[data-view], [data-rail-view]").forEach((btn) => {
+  document.querySelectorAll("[data-sidebar]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      state.view = btn.dataset.view || btn.dataset.railView;
+      state.sidebarMode = btn.dataset.sidebar;
+      if (state.fullscreen) {
+        setFullscreen(false);
+      }
+      if (state.leftCollapsed) {
+        state.leftCollapsed = false;
+        el.reviewWorkspace.classList.remove("is-left-collapsed");
+      }
+      renderLeftSidebar();
+    });
+  });
+
+  document.querySelectorAll("[data-view]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.view = btn.dataset.view;
       syncViewButtons();
       renderStage();
     });
@@ -639,12 +712,8 @@
     renderStage();
   });
 
-  el.railFit.addEventListener("click", () => {
+  el.zoomReset.addEventListener("click", () => {
     state.zoom = 1.0;
-    state.scale = "fit";
-    document.querySelectorAll("[data-scale]").forEach((b) => {
-      b.classList.toggle("is-active", b.dataset.scale === "fit");
-    });
     renderStage();
   });
 
@@ -758,8 +827,9 @@
     const resp = await fetch("/api/session");
     const data = await resp.json();
     state.session = data;
-    if (!state.activeId && data.candidates.length > 0) {
-      state.activeId = data.candidates[0].id;
+    const all = allSelectableCandidates();
+    if (!state.activeId || !all.some((c) => c.id === state.activeId)) {
+      state.activeId = all.length > 0 ? all[0].id : null;
     }
     const dirName = (data.dir || "").split("/").filter(Boolean).pop() || data.dir || "";
     el.sessionDir.textContent = dirName;

@@ -241,21 +241,10 @@ body {
   gap: 8px;
 }
 
-.sidebar-title-group {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
 .sidebar-title {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
-}
-
-.sidebar-meta {
-  font-size: 11px;
-  color: var(--text-muted);
 }
 
 .candidate-scroll {
@@ -264,7 +253,18 @@ body {
   padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
+}
+
+.round-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.round-group + .round-group {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-hairline);
 }
 
 .round-group-head {
@@ -277,6 +277,20 @@ body {
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
+}
+
+.history-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-log-empty {
+  padding: 10px 12px;
+  border: 1px dashed var(--border-hairline);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .candidate-grid {
@@ -715,6 +729,10 @@ body {
   font-weight: 500;
   padding: 7px 8px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .decision-btn:hover {
@@ -866,13 +884,14 @@ textarea:focus {
 .history-row,
 .warning-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 9px 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-hairline);
   border-radius: 6px;
   font-size: 11px;
+  line-height: 1.45;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
@@ -880,6 +899,7 @@ textarea:focus {
 .history-icon {
   width: 14px;
   height: 14px;
+  margin-top: 1px;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -887,12 +907,26 @@ textarea:focus {
   color: var(--text-primary);
 }
 
-.history-text {
+.history-content {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.history-row.is-resolved .history-text {
+.history-title {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.history-summary {
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.history-row.is-resolved .history-title,
+.history-row.is-resolved .history-summary {
   text-decoration: line-through;
   color: var(--text-muted);
 }

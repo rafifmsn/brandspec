@@ -68,6 +68,11 @@ def test_session_discovers_single_and_multi_candidate_dirs(tmp_path: Path) -> No
         assert _http_status(f"http://127.0.0.1:{port}/assets/studio.css") == 200
         assert _http_status(f"http://127.0.0.1:{port}/assets/studio.js") == 200
 
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=5) as resp:
+            html_text = resp.read().decode("utf-8")
+        assert "<title>Brandspec</title>" in html_text
+        assert "Brandspec</span>" in html_text
+
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/assets/studio.css", timeout=5) as resp:
             css_text = resp.read().decode("utf-8")
         assert "monospace" not in css_text.lower()
@@ -157,6 +162,15 @@ def test_post_review_writes_json_and_unblocks_wait(tmp_path: Path) -> None:
             assert status == 200
             assert sess["round"] == 2
             assert sess["latest_review"]["round"] == 1
+            assert len(sess["round_groups"]) == 1
+            assert sess["round_groups"][0]["round"] == 1
+            assert sess["round_groups"][0]["candidates"][0]["id"] == "round-1/default"
+            assert (
+                _http_status(f"{url}api/rounds/round-1/default/logo.svg") == 200
+            )
+            assert (
+                _http_status(f"{url}api/rounds/round-1/default/../secret.txt") in (403, 404)
+            )
 
             status, body = _http_json(
                 f"{url}api/review",
