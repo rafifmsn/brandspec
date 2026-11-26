@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BrandSpec Studio</title>
+    <link rel="stylesheet" href="/assets/studio.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-title">
+          <span class="brand-word">BrandSpec Studio</span>
+          <span class="meta-divider">/</span>
+          <span id="session-dir" class="session-path"></span>
+        </div>
+        <div class="topbar-meta">
+          <div id="mode-tabs" class="btn-group" hidden>
+            <button type="button" class="btn btn-secondary is-active" data-tab="review">Review</button>
+            <button type="button" class="btn btn-secondary" data-tab="mockups">Mockups</button>
+          </div>
+          <span id="round-label" class="tabular">Round 1</span>
+          <span class="meta-divider">/</span>
+          <span id="candidate-count" class="tabular">0 candidates</span>
+        </div>
+      </header>
+
+      <section id="candidate-strip" class="candidate-strip" hidden></section>
+
+      <section id="mockups-panel" class="panel mockups-panel" hidden>
+        <div class="panel-header">
+          <h2>Contextual Mockups</h2>
+          <span class="subtitle">Live browser previews from tokens and kit artifacts</span>
+        </div>
+        <div id="mockups-grid" class="mockups-grid"></div>
+      </section>
+
+      <main id="review-stage" class="stage-grid">
+        <section class="panel stage-panel">
+          <div class="toolbar">
+            <div class="btn-group" role="group" aria-label="View mode">
+              <button type="button" class="btn btn-secondary is-active" data-view="positive">Positive</button>
+              <button type="button" class="btn btn-secondary" data-view="inverted">Inverted</button>
+              <button type="button" class="btn btn-secondary" data-view="grid">Grid</button>
+              <button type="button" class="btn btn-secondary" data-view="96">96px</button>
+              <button type="button" class="btn btn-secondary" data-view="48">48px</button>
+              <button type="button" class="btn btn-secondary" data-view="24">24px</button>
+            </div>
+            <label class="surface-control" for="surface-hex">
+              <span>Surface</span>
+              <input id="surface-hex" type="text" value="" placeholder="#ffffff" maxlength="7" />
+            </label>
+          </div>
+
+          <div class="canvas-well" id="canvas-well">
+            <div id="canvas-frame" class="canvas-frame">
+              <img id="mark-image" alt="Compiled brand mark" draggable="false" />
+              <div id="pin-layer" class="pin-layer"></div>
+            </div>
+          </div>
+
+          <div class="metrics-bar" id="metrics-bar"></div>
+          <div class="warnings-bar" id="warnings-bar" hidden></div>
+        </section>
+
+        <aside class="panel review-panel">
+          <div class="panel-header">
+            <h2 id="candidate-title">Review</h2>
+            <span id="candidate-subtitle" class="subtitle"></span>
+          </div>
+
+          <div class="decision-row" role="group" aria-label="Review decision">
+            <button type="button" class="btn btn-secondary decision-btn" data-status="approve">Approve</button>
+            <button type="button" class="btn btn-secondary decision-btn is-active" data-status="revise">Revise</button>
+            <button type="button" class="btn btn-secondary decision-btn" data-status="reject">Reject</button>
+          </div>
+
+          <div class="section-block">
+            <div class="section-head">
+              <h3>Pin Comments</h3>
+              <span class="hint-text">Click canvas to pin grid coordinates</span>
+            </div>
+            <div id="pin-list" class="pin-list"></div>
+          </div>
+
+          <div class="section-block">
+            <label class="field-label" for="review-summary">Review Summary</label>
+            <textarea id="review-summary" rows="3" placeholder="Concise revision or sign-off notes"></textarea>
+          </div>
+
+          <div class="submit-row">
+            <button type="button" id="submit-review" class="btn btn-primary">Submit Review</button>
+            <span id="submit-status" class="submit-status"></span>
+          </div>
+
+          <div id="history-block" class="section-block" hidden>
+            <div class="section-head">
+              <h3>Prior Rounds</h3>
+            </div>
+            <div id="history-list" class="history-list"></div>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <script src="/assets/studio.js" defer></script>
+  </body>
+</html>

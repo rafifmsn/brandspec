@@ -83,6 +83,17 @@ npx skills add rafifmsn/brandspec
 | `brandspec init <archetype> --out <path>` | Copies a bundled archetype spec to a working `spec.json`. |
 | `brandspec build <spec.json> [--out-dir <dir>] [--strict]` | Compiles `logo.svg`, `sheet.png`, `metrics.json`, and locked `spec.json`. Exits with code `2` under `--strict` if any quality warning triggers. |
 | `brandspec check <spec.json>` | Validates the schema and prints `metrics.json` without writing output files. |
+| `brandspec sweep <spec.json> [--set path=v1,v2] [--sweep <sweep.json>]` | Compiles a bounded parameter matrix (`--max-variants`, `--only-passed`, `--review`) into studio-ready variants and `contact_sheet.png`. |
+| `brandspec review --dir <dir> [--wait] [--timeout 900]` | Starts the localhost review console and optionally blocks until human pin feedback is submitted to `review.json`. |
+| `brandspec serve --dir <dir> [--port 8420]` | Serves compiled outputs in the localhost review UI. |
+| `brandspec tokens check <tokens.spec.json>` | Audits WCAG 2.1 and APCA contrast across declared token and surface pairs. |
+| `brandspec palette extract <image> [--colors 6] [--out <path>]` | Quantizes a reference image into deterministic hex `tokens.spec.json`. |
+| `brandspec kit build <kit.spec.json> [--out-dir <dir>]` | Exports SVG variants, `favicon.ico`, PWA icons, `og-card.png`, and `tokens.css`. |
+| `brandspec wordmark build <wordmark.spec.json> [--out-dir <dir>]` | Outlines `.ttf`/`.otf` glyphs via `fontTools` with kerning, ink traps, and stencil cuts. |
+| `brandspec lockup build <lockup.spec.json> [--out-dir <dir>]` | Pairs mark and wordmark into horizontal, stacked, or badge lockups with `1u`/`2u` clearspace guides. |
+| `brandspec icons build <icons.spec.json> [--out-dir <dir>]` | Compiles matched `24x24` icon sets inheriting mark geometry defaults. |
+| `brandspec pattern build <pattern.spec.json> [--out-dir <dir>]` | Compiles 3x3 periodic-wrapped seamless tiling SVG patterns. |
+| `brandspec install-skill [--target <preset-or-path>] [--force]` | Installs the bundled `SKILL.md` for AI agents (`agents`, `project`, `claude`, `cursor`, `codex`, `antigravity`, or a custom path). |
 
 ## Mark Engine Specification (`spec.json`)
 

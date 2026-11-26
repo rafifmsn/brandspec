@@ -12,6 +12,21 @@ from .grid import Point2D
 
 KAPPA = 0.5522847498307936
 
+CapStyle = Literal["butt", "round", "square"]
+JoinStyle = Literal["miter", "round", "bevel"]
+
+LINE_CAP_MAP: dict[CapStyle, pathops.LineCap] = {
+    "butt": pathops.LineCap.BUTT_CAP,
+    "round": pathops.LineCap.ROUND_CAP,
+    "square": pathops.LineCap.SQUARE_CAP,
+}
+
+LINE_JOIN_MAP: dict[JoinStyle, pathops.LineJoin] = {
+    "miter": pathops.LineJoin.MITER_JOIN,
+    "round": pathops.LineJoin.ROUND_JOIN,
+    "bevel": pathops.LineJoin.BEVEL_JOIN,
+}
+
 
 class SymmetrySpec(BaseModel):
     type: Literal[
@@ -124,16 +139,25 @@ def add_rounded_polygon(
     return p
 
 
-def dilate_path(path: pathops.Path, halo_radius: float) -> pathops.Path:
+def dilate_path(
+    path: pathops.Path,
+    halo_radius: float,
+    join: JoinStyle = "round",
+    cap: CapStyle = "round",
+) -> pathops.Path:
     """Expand a closed path outward by halo_radius for clean negative-space carving."""
     if halo_radius <= 1e-6:
         return path
+    if join not in LINE_JOIN_MAP:
+        raise ValueError(f"Unsupported halo join style: {join!r}")
+    if cap not in LINE_CAP_MAP:
+        raise ValueError(f"Unsupported halo cap style: {cap!r}")
     ring = pathops.Path()
     ring.addPath(path)
     ring.stroke(
         2.0 * halo_radius,
-        pathops.LineCap.ROUND_CAP,
-        pathops.LineJoin.ROUND_JOIN,
+        LINE_CAP_MAP[cap],
+        LINE_JOIN_MAP[join],
         4.0,
     )
     ring.convertConicsToQuads(0.05)
@@ -200,7 +224,21 @@ def path_to_svg_d(path: pathops.Path, precision: int = 2) -> str:
             x, y = pts[0]
             parts.append(f"L {_fmt(x, precision)} {_fmt(y, precision)}")
         elif verb == "qCurveTo":
-            if len(pts) == 2:
+            if pts and pts[-1] is None:
+                off = pts[:-1]
+                if len(off) >= 2:
+                    sx = 0.5 * (off[-1][0] + off[0][0])
+                    sy = 0.5 * (off[-1][1] + off[0][1])
+                    parts.append(f"M {_fmt(sx, precision)} {_fmt(sy, precision)}")
+                    for i in range(len(off)):
+                        cx, cy = off[i]
+                        nx, ny = off[(i + 1) % len(off)]
+                        mx, my = 0.5 * (cx + nx), 0.5 * (cy + ny)
+                        parts.append(
+                            f"Q {_fmt(cx, precision)} {_fmt(cy, precision)} "
+                            f"{_fmt(mx, precision)} {_fmt(my, precision)}"
+                        )
+            elif len(pts) == 2:
                 (x1, y1), (x2, y2) = pts
                 parts.append(
                     f"Q {_fmt(x1, precision)} {_fmt(y1, precision)} "

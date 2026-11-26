@@ -7,7 +7,7 @@ import math
 import pathops
 
 from ...core.grid import GridSpec, Point2D, grid_to_xy
-from ...core.paths import add_rounded_polygon, circle_path
+from ...core.paths import LINE_CAP_MAP, LINE_JOIN_MAP, add_rounded_polygon, circle_path
 from .fields import build_halftone_grid, build_line_screen, build_radial_blades
 from .schema import (
     ArcBandShape,
@@ -22,19 +22,6 @@ from .schema import (
     ShapeSpec,
 )
 
-CAP_MAP = {
-    "butt": pathops.LineCap.BUTT_CAP,
-    "round": pathops.LineCap.ROUND_CAP,
-    "square": pathops.LineCap.SQUARE_CAP,
-}
-
-JOIN_MAP = {
-    "miter": pathops.LineJoin.MITER_JOIN,
-    "round": pathops.LineJoin.ROUND_JOIN,
-    "bevel": pathops.LineJoin.BEVEL_JOIN,
-}
-
-
 def _stroke_and_simplify(
     path: pathops.Path,
     width: float,
@@ -43,7 +30,7 @@ def _stroke_and_simplify(
 ) -> pathops.Path:
     out = pathops.Path()
     out.addPath(path)
-    out.stroke(width, CAP_MAP[cap], JOIN_MAP[join], 4.0)
+    out.stroke(width, LINE_CAP_MAP[cap], LINE_JOIN_MAP[join], 4.0)
     out.convertConicsToQuads(0.05)
     return pathops.simplify(out, fix_winding=True)
 

@@ -32,6 +32,38 @@ def grid_to_xy(pt: Point2D, grid: GridSpec, unit: float) -> Point2D:
     raise ValueError(f"Unsupported grid type: {grid.type}")
 
 
+def xy_to_grid(pt: Point2D, grid: GridSpec, unit: float) -> Point2D:
+    """Convert centered design-space XY coordinates back into grid coordinates."""
+    x, y = pt
+    if grid.type == "square":
+        return (x / unit, y / unit)
+    if grid.type == "isometric":
+        a = x / (unit * COS_30)
+        b = y / unit - 0.5 * a
+        return (a, b)
+    if grid.type == "polar":
+        r = math.hypot(x, y) / unit
+        if r <= 1e-12:
+            return (0.0, 0.0)
+        deg = (math.degrees(math.atan2(x, -y)) + 360.0) % 360.0
+        return (r, deg)
+    raise ValueError(f"Unsupported grid type: {grid.type}")
+
+
+def canvas_to_grid(
+    px: float,
+    py: float,
+    affine: tuple[float, float, float, float, float, float],
+    grid: GridSpec,
+    unit: float,
+) -> Point2D:
+    """Convert SVG canvas pixel coordinates to grid coordinates using inverse affine."""
+    sx, _, _, sy, tx, ty = affine
+    x = (px - tx) / sx
+    y = (py - ty) / sy
+    return xy_to_grid((x, y), grid, unit)
+
+
 def grid_overlay_svg(
     grid: GridSpec,
     unit: float,

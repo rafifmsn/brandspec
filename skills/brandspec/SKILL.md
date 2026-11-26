@@ -12,13 +12,16 @@ Always express the construction in a `spec.json` recipe and compile it determini
 
 ## Available CLI Commands
 
-Run `brandspec` directly (or via `uvx brandspec` / `uv run brandspec` inside the repo):
+Prefer `brandspec` if it is on `PATH`.
+Otherwise run `uvx brandspec ...` directly (or `uv run brandspec ...` inside a local repository clone):
 
 ```bash
-brandspec archetypes
+brandspec archetypes            # or: uvx brandspec archetypes
 brandspec init <archetype> --out <path/to/spec.json>
 brandspec build <path/to/spec.json> --out-dir <path/to/out>
 brandspec check <path/to/spec.json>
+brandspec sweep <path/to/spec.json> --set layers.1.halo=0.35,0.4,0.45 --out-dir <path/to/out>
+brandspec review --dir <path/to/out> --wait
 ```
 
 Each `build` outputs four deterministic artifacts:
@@ -30,7 +33,9 @@ Each `build` outputs four deterministic artifacts:
 ## Modernist Construction Rules
 
 1. **One unit governs everything**: Express stroke widths, gaps, radii, and clearances as clean multiples of the grid unit (`1.0`, `0.5`, `0.4`).
-2. **Use `halo` and `halo_targets` for interlocking gaps**: Instead of manually calculating negative cutout bars where ribbons cross, put the crossing ribbon in its own `unite` layer with `"halo": 0.35` to `"halo": 0.5`. When adding an overpass that re-crosses an earlier band without cutting itself, set `"halo_targets": ["<crossing-layer-id>"]` so `halo` carves only the target layer and requires zero seam-healing patches.
+2. **Use `halo` and `halo_targets` for interlocking gaps**: Instead of manually calculating negative cutout bars where ribbons cross, put the crossing ribbon in its own `unite` layer with `"halo": 0.35` to `"halo": 0.5`.
+For sharp angular or isometric `grid_path` weaves, set `"halo_join": "miter"` so the outward dilation preserves crisp parallel negative-space channels instead of carving curved shoulder notches.
+When adding an overpass that re-crosses an earlier band without cutting itself, set `"halo_targets": ["<crossing-layer-id>"]` so `halo` carves only the target layer and requires zero seam-healing patches.
 3. **Use `grid_path` with `corner_radius` for continuous forms**: Prefer a single `grid_path` polyline with `corner_radius` over separate bars and arcs so tangents and stroke weights remain seamless.
 4. **Use `clip_to` for optical effects**: Combine `line_screen` or `halftone_grid` with `clip_to: [circle | polygon | rect]` to produce kinetic optical marks cleanly.
 5. **Preserve 24px legibility**: Keep minimum stripe widths and `halo` gaps large enough (`>= 0.3` unit) so negative space does not collapse at 24px.
@@ -51,6 +56,7 @@ Each `build` outputs four deterministic artifacts:
   - `line_screen`: `center`, `angle_deg`, `count`, `pitch`, `length`, `min_width`, `max_width`, `profile` (`constant`, `linear`, `center_bulge`, `center_pinch`, `sine`, `exponential`), `invert_profile`.
   - `radial_blades`: `center`, `count`, `inner_radius`, `outer_radius`, `angle_deg`, `twist_deg`, `inner_width_deg`, `outer_width_deg`, `curve_bias`.
   - `halftone_grid`: `center`, `cols`, `rows`, `pitch`, `shape` (`circle`, `square`, `diamond`), `min_size`, `max_size`, `field` (`radial_decay`, `radial_grow`, `linear_x`, `linear_y`, `diagonal`, `sine_ripple`).
+- **Layers (`layers[]`)**: `id`, `op` (`"unite"`, `"subtract"`, `"intersect"`, `"xor"`), `halo`, `halo_join` (`"round"`, `"miter"`, `"bevel"`), `halo_cap` (`"round"`, `"butt"`, `"square"`), `halo_targets`, `shapes`, `clip_to`, `symmetry`.
 - **Symmetry (`symmetry.type`)**: `"none"`, `"mirror_x"`, `"mirror_y"`, `"mirror_xy"`, `"rotate"` (`count`, `step_deg`, `scale_step`), `"glide_x"`.
 
 ## Agent Workflow (3 Steps)
