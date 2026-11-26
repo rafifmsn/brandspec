@@ -6,36 +6,65 @@
     activeId: null,
     tab: "review",
     view: "positive",
+    scale: "fit",
+    zoom: 1.0,
     surfaceHex: "",
     status: "revise",
     pins: [],
-    nextPinId: 1,
+    focusedPinIndex: -1,
+    leftCollapsed: false,
   };
 
   const el = {
     sessionDir: document.getElementById("session-dir"),
+    activeCrumb: document.getElementById("active-crumb"),
+    roundPill: document.getElementById("round-pill"),
     modeTabs: document.getElementById("mode-tabs"),
-    roundLabel: document.getElementById("round-label"),
     candidateCount: document.getElementById("candidate-count"),
-    candidateStrip: document.getElementById("candidate-strip"),
-    reviewStage: document.getElementById("review-stage"),
+    activeHealth: document.getElementById("active-health"),
+    reviewWorkspace: document.getElementById("review-workspace"),
     mockupsPanel: document.getElementById("mockups-panel"),
     mockupsGrid: document.getElementById("mockups-grid"),
-    candidateTitle: document.getElementById("candidate-title"),
-    candidateSubtitle: document.getElementById("candidate-subtitle"),
+    sidebarCount: document.getElementById("sidebar-count"),
+    candidateGrid: document.getElementById("candidate-grid"),
+    artboardWrap: document.getElementById("artboard-wrap"),
     canvasFrame: document.getElementById("canvas-frame"),
     markImage: document.getElementById("mark-image"),
     pinLayer: document.getElementById("pin-layer"),
-    metricsBar: document.getElementById("metrics-bar"),
-    warningsBar: document.getElementById("warnings-bar"),
+    hoverCoords: document.getElementById("hover-coords"),
+    metricsDock: document.getElementById("metrics-dock"),
+    zoomReadout: document.getElementById("zoom-readout"),
     surfaceHex: document.getElementById("surface-hex"),
+    hexSwatch: document.getElementById("hex-swatch"),
+    candidateTitle: document.getElementById("candidate-title"),
+    candidateSubtitle: document.getElementById("candidate-subtitle"),
+    variantParams: document.getElementById("variant-params"),
+    pinCount: document.getElementById("pin-count"),
+    clearPins: document.getElementById("clear-pins"),
     pinList: document.getElementById("pin-list"),
     reviewSummary: document.getElementById("review-summary"),
     submitBtn: document.getElementById("submit-review"),
     submitStatus: document.getElementById("submit-status"),
-    historyBlock: document.getElementById("history-block"),
+    warningsAccordion: document.getElementById("warnings-accordion"),
+    warningsCount: document.getElementById("warnings-count"),
+    warningsList: document.getElementById("warnings-list"),
+    historyAccordion: document.getElementById("history-accordion"),
+    historyCount: document.getElementById("history-count"),
     historyList: document.getElementById("history-list"),
+    railToggleLeft: document.getElementById("rail-toggle-left"),
+    railFit: document.getElementById("rail-fit"),
+    zoomIn: document.getElementById("zoom-in"),
+    zoomOut: document.getElementById("zoom-out"),
   };
+
+  function renumberPins() {
+    state.pins.forEach((pin, idx) => {
+      pin.id = idx + 1;
+    });
+    if (state.focusedPinIndex >= state.pins.length) {
+      state.focusedPinIndex = state.pins.length - 1;
+    }
+  }
 
   function activeCandidate() {
     if (!state.session || !state.session.candidates.length) return null;
@@ -43,6 +72,11 @@
       state.session.candidates.find((c) => c.id === state.activeId) ||
       state.session.candidates[0]
     );
+  }
+
+  function variantInfo(cid) {
+    if (!state.session || !Array.isArray(state.session.variants)) return null;
+    return state.session.variants.find((v) => v.id === cid) || null;
   }
 
   function gridToCanvasPercent(xGrid, yGrid, meta) {
@@ -104,69 +138,112 @@
     };
   }
 
-  function renderCandidateStrip() {
+  function renderCandidateGrid() {
     const candidates = state.session ? state.session.candidates : [];
-    if (candidates.length <= 1) {
-      el.candidateStrip.hidden = true;
-      el.candidateStrip.innerHTML = "";
-      return;
-    }
-    el.candidateStrip.hidden = false;
-    el.candidateStrip.innerHTML = "";
+    el.sidebarCount.textContent = String(candidates.length);
+    el.candidateGrid.innerHTML = "";
+
     candidates.forEach((cand) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "candidate-tile" + (cand.id === state.activeId ? " is-selected" : "");
+      btn.className = "candidate-card" + (cand.id === state.activeId ? " is-selected" : "");
+
+      const thumbBox = document.createElement("div");
+      thumbBox.className = "candidate-thumb-box";
       const img = document.createElement("img");
-      img.className = "candidate-thumb";
       img.src = cand.files.logo_svg;
       img.alt = cand.id;
-      const lbl = document.createElement("div");
-      lbl.className = "candidate-label";
+      thumbBox.appendChild(img);
+
+      const metaRow = document.createElement("div");
+      metaRow.className = "candidate-card-meta tabular";
       const idSpan = document.createElement("span");
       idSpan.textContent = cand.id;
       const statusSpan = document.createElement("span");
       statusSpan.textContent = cand.metrics && cand.metrics.passed ? "PASS" : "WARN";
-      lbl.appendChild(idSpan);
-      lbl.appendChild(statusSpan);
-      btn.appendChild(img);
-      btn.appendChild(lbl);
+      metaRow.appendChild(idSpan);
+      metaRow.appendChild(statusSpan);
+
+      btn.appendChild(thumbBox);
+      btn.appendChild(metaRow);
+
+      const vInfo = variantInfo(cand.id);
+      if (vInfo && vInfo.params) {
+        const paramRow = document.createElement("div");
+        paramRow.className = "candidate-card-param tabular";
+        paramRow.textContent = Object.entries(vInfo.params)
+          .map(([k, v]) => `${k.split(".").pop()}=${v}`)
+          .join(" ");
+        btn.appendChild(paramRow);
+      }
+
       btn.addEventListener("click", () => {
         state.activeId = cand.id;
         renderAll();
       });
-      el.candidateStrip.appendChild(btn);
+      el.candidateGrid.appendChild(btn);
     });
   }
 
   function renderStage() {
     const cand = activeCandidate();
     if (!cand) {
+      el.activeCrumb.textContent = "none";
       el.candidateTitle.textContent = "No candidates";
       el.candidateSubtitle.textContent = "Compile a mark or sweep first.";
       el.markImage.removeAttribute("src");
-      el.metricsBar.innerHTML = "";
+      el.metricsDock.innerHTML = "";
       return;
     }
+
+    el.activeCrumb.textContent = cand.id;
+    const passed = cand.metrics && cand.metrics.passed;
+    el.activeHealth.textContent = passed ? "PASS" : "WARN";
+    el.activeHealth.className = "pill-badge tabular" + (passed ? " is-pass" : "");
 
     const name = (cand.meta && cand.meta.name) || cand.id;
     const concept = (cand.meta && cand.meta.concept) || "";
     el.candidateTitle.textContent = `${cand.id}: ${name}`;
     el.candidateSubtitle.textContent = concept;
 
+    const vInfo = variantInfo(cand.id);
+    el.variantParams.innerHTML = "";
+    if (vInfo && vInfo.params) {
+      el.variantParams.hidden = false;
+      Object.entries(vInfo.params).forEach(([k, v]) => {
+        const chip = document.createElement("span");
+        chip.className = "param-chip";
+        chip.textContent = `${k}=${v}`;
+        el.variantParams.appendChild(chip);
+      });
+    } else {
+      el.variantParams.hidden = true;
+    }
+
+    el.artboardWrap.style.transform = `scale(${state.zoom})`;
+    el.zoomReadout.textContent = `${Math.round(state.zoom * 100)}%`;
+
     el.canvasFrame.className = "canvas-frame";
     el.canvasFrame.style.background = "";
     if (state.view === "inverted") {
       el.canvasFrame.classList.add("is-inverted");
-    } else if (state.view === "96" || state.view === "48" || state.view === "24") {
-      el.canvasFrame.classList.add(`is-scale-${state.view}`);
+    } else if (state.view === "sheet") {
+      el.canvasFrame.classList.add("is-sheet");
+    }
+    if (state.scale !== "fit" && state.view !== "sheet") {
+      el.canvasFrame.classList.add(`is-scale-${state.scale}`);
     }
 
     if (state.surfaceHex && /^#[0-9a-fA-F]{6}$/.test(state.surfaceHex)) {
       el.canvasFrame.style.background = state.surfaceHex;
+      el.hexSwatch.style.background = state.surfaceHex;
+    } else {
+      el.hexSwatch.style.background = state.view === "inverted" ? "#0b0c0e" : "#ffffff";
     }
 
-    if (state.view === "grid" && cand.files.overlay_svg) {
+    if (state.view === "sheet" && cand.files.sheet_png) {
+      el.markImage.src = cand.files.sheet_png;
+    } else if (state.view === "grid" && cand.files.overlay_svg) {
       el.markImage.src = cand.files.overlay_svg;
     } else {
       el.markImage.src = cand.files.logo_svg;
@@ -177,39 +254,52 @@
   }
 
   function renderMetrics(metrics) {
-    el.metricsBar.innerHTML = "";
+    el.metricsDock.innerHTML = "";
     if (!metrics) return;
+
     const items = [
-      ["Ink Ratio", metrics.ink_ratio],
-      ["24px Ink", metrics.ink_ratio_24px],
+      ["Ink", metrics.ink_ratio],
+      ["24px", metrics.ink_ratio_24px],
       ["Aspect", metrics.bbox_aspect],
       ["Islands", metrics.island_count],
       ["Slivers", metrics.tiny_island_count],
-      ["Drift %", metrics.optical_drift_pct],
+      ["Drift", metrics.optical_drift_pct !== undefined ? `${metrics.optical_drift_pct}%` : "-"],
     ];
     items.forEach(([key, val]) => {
       const cell = document.createElement("div");
-      cell.className = "metric-cell";
-      cell.innerHTML = `<span class="metric-key">${key}</span><span class="metric-val">${val ?? "-"}</span>`;
-      el.metricsBar.appendChild(cell);
+      cell.className = "telemetry-item";
+      const kSpan = document.createElement("span");
+      kSpan.className = "telemetry-key";
+      kSpan.textContent = key;
+      const vSpan = document.createElement("span");
+      vSpan.className = "telemetry-val";
+      vSpan.textContent = val ?? "-";
+      cell.appendChild(kSpan);
+      cell.appendChild(vSpan);
+      el.metricsDock.appendChild(cell);
     });
 
-    if (Array.isArray(metrics.warnings) && metrics.warnings.length > 0) {
-      el.warningsBar.hidden = false;
-      el.warningsBar.textContent = metrics.warnings.join(" | ");
-    } else {
-      el.warningsBar.hidden = true;
-      el.warningsBar.textContent = "";
-    }
+    const warnings = Array.isArray(metrics.warnings) ? metrics.warnings : [];
+    el.warningsAccordion.hidden = warnings.length === 0;
+    el.warningsCount.textContent = String(warnings.length);
+    el.warningsList.innerHTML = "";
+    warnings.forEach((msg) => {
+      const row = document.createElement("div");
+      row.className = "warning-row";
+      row.textContent = msg;
+      el.warningsList.appendChild(row);
+    });
   }
 
   function renderPinsOnCanvas(cand) {
     el.pinLayer.innerHTML = "";
-    const activePins = state.pins.filter((p) => p.candidate_id === cand.id);
-    activePins.forEach((pin) => {
+    if (state.view === "sheet" || state.scale !== "fit") return;
+
+    state.pins.forEach((pin, idx) => {
+      if (pin.candidate_id !== cand.id) return;
       const { xPct, yPct } = gridToCanvasPercent(pin.x_grid, pin.y_grid, cand.meta);
       const marker = document.createElement("div");
-      marker.className = "pin-marker";
+      marker.className = "pin-marker" + (idx === state.focusedPinIndex ? " is-focused" : "");
       marker.style.left = `${xPct}%`;
       marker.style.top = `${yPct}%`;
       marker.textContent = String(pin.id);
@@ -217,43 +307,74 @@
     });
   }
 
-  function renderPinList() {
+  function renderPinList(focusNewInput = false) {
+    el.pinCount.textContent = `(${state.pins.length})`;
+    el.clearPins.hidden = state.pins.length === 0;
     el.pinList.innerHTML = "";
+
     if (state.pins.length === 0) {
       const empty = document.createElement("div");
-      empty.className = "hint-text";
-      empty.textContent = "No pinned notes yet.";
+      empty.className = "pin-empty";
+      empty.textContent = "Click anywhere on the mark artboard to pin grid coordinates.";
       el.pinList.appendChild(empty);
       return;
     }
-    state.pins.forEach((pin) => {
-      const item = document.createElement("div");
-      item.className = "pin-item";
+
+    state.pins.forEach((pin, idx) => {
+      const card = document.createElement("div");
+      card.className = "pin-card" + (idx === state.focusedPinIndex ? " is-focused" : "");
+
       const head = document.createElement("div");
-      head.className = "pin-item-head";
-      head.innerHTML = `<span>#${pin.id} ${pin.candidate_id} (${pin.x_grid}, ${pin.y_grid})</span>`;
+      head.className = "pin-card-head";
+
+      const title = document.createElement("span");
+      title.className = "pin-card-title";
+      title.textContent = `#${pin.id}  ${pin.candidate_id}  (${pin.x_grid}, ${pin.y_grid})`;
+
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
-      removeBtn.className = "pin-remove";
+      removeBtn.className = "text-btn";
       removeBtn.textContent = "Remove";
-      removeBtn.addEventListener("click", () => {
-        state.pins = state.pins.filter((p) => p.id !== pin.id);
+      removeBtn.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        state.pins.splice(idx, 1);
+        renumberPins();
         renderAll();
       });
+
+      head.appendChild(title);
       head.appendChild(removeBtn);
 
       const input = document.createElement("input");
       input.type = "text";
-      input.className = "pin-comment-input";
+      input.className = "pin-input";
       input.value = pin.comment;
       input.placeholder = "Describe geometric change at this coordinate";
+      input.addEventListener("focus", () => {
+        state.focusedPinIndex = idx;
+        renderPinsOnCanvas(activeCandidate());
+      });
       input.addEventListener("input", (evt) => {
         pin.comment = evt.target.value;
       });
 
-      item.appendChild(head);
-      item.appendChild(input);
-      el.pinList.appendChild(item);
+      card.addEventListener("click", () => {
+        state.focusedPinIndex = idx;
+        if (pin.candidate_id && pin.candidate_id !== state.activeId) {
+          state.activeId = pin.candidate_id;
+          renderAll();
+        } else {
+          renderPinsOnCanvas(activeCandidate());
+        }
+      });
+
+      card.appendChild(head);
+      card.appendChild(input);
+      el.pinList.appendChild(card);
+
+      if (focusNewInput && idx === state.pins.length - 1) {
+        input.focus();
+      }
     });
   }
 
@@ -266,15 +387,13 @@
     if (state.session.latest_review) {
       rounds.push(state.session.latest_review);
     }
-    if (rounds.length === 0) {
-      el.historyBlock.hidden = true;
-      return;
-    }
-    el.historyBlock.hidden = false;
+
+    el.historyAccordion.hidden = rounds.length === 0;
+    el.historyCount.textContent = String(rounds.length);
     el.historyList.innerHTML = "";
     rounds.forEach((item) => {
       const row = document.createElement("div");
-      row.className = "history-item";
+      row.className = "history-row";
       const pinsCount = Array.isArray(item.pins) ? item.pins.length : 0;
       row.textContent = `Round ${item.round}: ${item.status} (${pinsCount} pins) ${item.summary || ""}`.trim();
       el.historyList.appendChild(row);
@@ -289,7 +408,7 @@
     }
     const showMockups = hasMockups && state.tab === "mockups";
     el.mockupsPanel.hidden = !showMockups;
-    el.reviewStage.hidden = showMockups;
+    el.reviewWorkspace.hidden = showMockups;
     if (!showMockups) return;
 
     el.mockupsGrid.innerHTML = "";
@@ -380,10 +499,20 @@
     }
   }
 
-  function renderAll() {
-    renderCandidateStrip();
+  function syncViewButtons() {
+    document.querySelectorAll("[data-view]").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.view === state.view);
+    });
+    document.querySelectorAll("[data-rail-view]").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.railView === state.view);
+    });
+  }
+
+  function renderAll(focusNewInput = false) {
+    syncViewButtons();
+    renderCandidateGrid();
     renderStage();
-    renderPinList();
+    renderPinList(focusNewInput);
     renderHistory();
     renderMockups();
   }
@@ -397,10 +526,18 @@
     });
   });
 
-  document.querySelectorAll("[data-view]").forEach((btn) => {
+  document.querySelectorAll("[data-view], [data-rail-view]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      state.view = btn.dataset.view;
-      document.querySelectorAll("[data-view]").forEach((b) => b.classList.remove("is-active"));
+      state.view = btn.dataset.view || btn.dataset.railView;
+      syncViewButtons();
+      renderStage();
+    });
+  });
+
+  document.querySelectorAll("[data-scale]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.scale = btn.dataset.scale;
+      document.querySelectorAll("[data-scale]").forEach((b) => b.classList.remove("is-active"));
       btn.classList.add("is-active");
       renderStage();
     });
@@ -414,32 +551,83 @@
     });
   });
 
+  el.zoomIn.addEventListener("click", () => {
+    state.zoom = Math.min(2.0, Number((state.zoom + 0.15).toFixed(2)));
+    renderStage();
+  });
+
+  el.zoomOut.addEventListener("click", () => {
+    state.zoom = Math.max(0.5, Number((state.zoom - 0.15).toFixed(2)));
+    renderStage();
+  });
+
+  el.railFit.addEventListener("click", () => {
+    state.zoom = 1.0;
+    state.scale = "fit";
+    document.querySelectorAll("[data-scale]").forEach((b) => {
+      b.classList.toggle("is-active", b.dataset.scale === "fit");
+    });
+    renderStage();
+  });
+
+  el.railToggleLeft.addEventListener("click", () => {
+    state.leftCollapsed = !state.leftCollapsed;
+    el.reviewWorkspace.classList.toggle("is-left-collapsed", state.leftCollapsed);
+  });
+
   el.surfaceHex.addEventListener("input", (evt) => {
     state.surfaceHex = evt.target.value.trim();
     renderStage();
   });
 
+  el.clearPins.addEventListener("click", () => {
+    state.pins = [];
+    state.focusedPinIndex = -1;
+    renderAll();
+  });
+
+  el.canvasFrame.addEventListener("mousemove", (evt) => {
+    const cand = activeCandidate();
+    if (!cand || state.view === "sheet" || state.scale !== "fit") {
+      el.hoverCoords.hidden = true;
+      return;
+    }
+    const rect = el.canvasFrame.getBoundingClientRect();
+    const px = evt.clientX - rect.left;
+    const py = evt.clientY - rect.top;
+    const { xGrid, yGrid } = pixelToGrid(px, py, rect.width, rect.height, cand.meta);
+    el.hoverCoords.hidden = false;
+    el.hoverCoords.textContent = `${xGrid.toFixed(2)}, ${yGrid.toFixed(2)}`;
+  });
+
+  el.canvasFrame.addEventListener("mouseleave", () => {
+    el.hoverCoords.hidden = true;
+  });
+
   el.canvasFrame.addEventListener("click", (evt) => {
     const cand = activeCandidate();
-    if (!cand) return;
+    if (!cand || state.view === "sheet" || state.scale !== "fit") return;
     const rect = el.canvasFrame.getBoundingClientRect();
     const px = evt.clientX - rect.left;
     const py = evt.clientY - rect.top;
     const { xGrid, yGrid } = pixelToGrid(px, py, rect.width, rect.height, cand.meta);
     state.pins.push({
-      id: state.nextPinId++,
+      id: state.pins.length + 1,
       candidate_id: cand.id,
       x_grid: xGrid,
       y_grid: yGrid,
       comment: "",
     });
-    renderAll();
+    renumberPins();
+    state.focusedPinIndex = state.pins.length - 1;
+    renderAll(true);
   });
 
   el.submitBtn.addEventListener("click", async () => {
     el.submitBtn.disabled = true;
     el.submitStatus.textContent = "Saving review...";
     const cand = activeCandidate();
+    renumberPins();
     try {
       const resp = await fetch("/api/review", {
         method: "POST",
@@ -457,6 +645,9 @@
         el.submitBtn.disabled = false;
         return;
       }
+      state.pins = [];
+      state.focusedPinIndex = -1;
+      el.reviewSummary.value = "";
       el.submitStatus.textContent = `Submitted Round ${body.round} (${body.status}).`;
       await loadSession();
     } catch (err) {
@@ -473,8 +664,10 @@
     if (!state.activeId && data.candidates.length > 0) {
       state.activeId = data.candidates[0].id;
     }
-    el.sessionDir.textContent = data.dir || "";
-    el.roundLabel.textContent = `Round ${data.round || 1}`;
+    const dirName = (data.dir || "").split("/").filter(Boolean).pop() || data.dir || "";
+    el.sessionDir.textContent = dirName;
+    el.sessionDir.title = data.dir || "";
+    el.roundPill.textContent = `Round ${data.round || 1}`;
     el.candidateCount.textContent = `${data.candidates.length} candidate${data.candidates.length === 1 ? "" : "s"}`;
     renderAll();
   }

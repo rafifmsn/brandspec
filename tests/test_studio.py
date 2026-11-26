@@ -64,6 +64,19 @@ def test_session_discovers_single_and_multi_candidate_dirs(tmp_path: Path) -> No
         assert session["candidates"][0]["id"] == "default"
         assert session["candidates"][0]["meta"]["unit"] == 40.0
         assert _http_status(f"http://127.0.0.1:{port}/api/candidates/default/overlay.svg") == 200
+        assert _http_status(f"http://127.0.0.1:{port}/") == 200
+        assert _http_status(f"http://127.0.0.1:{port}/assets/studio.css") == 200
+        assert _http_status(f"http://127.0.0.1:{port}/assets/studio.js") == 200
+
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/assets/studio.css", timeout=5) as resp:
+            css_text = resp.read().decode("utf-8")
+        assert "monospace" not in css_text.lower()
+        assert "tabular-nums" in css_text
+
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/assets/studio.js", timeout=5) as resp:
+            js_text = resp.read().decode("utf-8")
+        assert "renumberPins" in js_text
+        assert "nextPinId" not in js_text
     finally:
         server.shutdown()
         server.server_close()

@@ -7,100 +7,184 @@
     <link rel="stylesheet" href="/assets/studio.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <div class="studio-shell">
       <header class="topbar">
-        <div class="topbar-title">
-          <span class="brand-word">BrandSpec Studio</span>
-          <span class="meta-divider">/</span>
-          <span id="session-dir" class="session-path"></span>
-        </div>
-        <div class="topbar-meta">
-          <div id="mode-tabs" class="btn-group" hidden>
-            <button type="button" class="btn btn-secondary is-active" data-tab="review">Review</button>
-            <button type="button" class="btn btn-secondary" data-tab="mockups">Mockups</button>
+        <div class="topbar-left">
+          <div class="brand-mark" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="12" height="12" stroke="currentColor" stroke-width="1.4" />
+              <path d="M2 2L14 14M14 2L2 14" stroke="currentColor" stroke-width="1.1" opacity="0.55" />
+              <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.4" />
+            </svg>
           </div>
-          <span id="round-label" class="tabular">Round 1</span>
-          <span class="meta-divider">/</span>
-          <span id="candidate-count" class="tabular">0 candidates</span>
+          <nav class="breadcrumbs" aria-label="Workspace path">
+            <span class="crumb-strong">BrandSpec</span>
+            <span class="crumb-sep">/</span>
+            <span id="session-dir" class="crumb-muted"></span>
+            <span class="crumb-sep">/</span>
+            <span id="active-crumb" class="crumb-strong tabular">default</span>
+            <span id="round-pill" class="pill-badge tabular">Round 1</span>
+          </nav>
+        </div>
+
+        <div class="topbar-right">
+          <div id="mode-tabs" class="segmented" hidden>
+            <button type="button" class="seg-btn is-active" data-tab="review">Review</button>
+            <button type="button" class="seg-btn" data-tab="mockups">Mockups</button>
+          </div>
+          <span id="candidate-count" class="topbar-stat tabular">0 candidates</span>
+          <span id="active-health" class="pill-badge tabular">PASS</span>
         </div>
       </header>
 
-      <section id="candidate-strip" class="candidate-strip" hidden></section>
+      <div id="review-workspace" class="workspace">
+        <aside class="tool-rail" aria-label="Canvas tools">
+          <button type="button" class="rail-btn is-active" id="rail-pin" title="Pin review mode" data-rail-view="positive">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.4" />
+              <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+          </button>
+          <button type="button" class="rail-btn" id="rail-grid" title="Construction grid overlay" data-rail-view="grid">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M5.5 2V14M10.5 2V14M2 5.5H14M2 10.5H14" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+          </button>
+          <button type="button" class="rail-btn" id="rail-sheet" title="4-panel inspection sheet" data-rail-view="sheet">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="5" height="5" stroke="currentColor" stroke-width="1.3" />
+              <rect x="9" y="2" width="5" height="5" stroke="currentColor" stroke-width="1.3" />
+              <rect x="2" y="9" width="5" height="5" stroke="currentColor" stroke-width="1.3" />
+              <rect x="9" y="9" width="5" height="5" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+          </button>
+          <div class="rail-spacer"></div>
+          <button type="button" class="rail-btn" id="rail-toggle-left" title="Toggle candidates panel">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3" />
+              <path d="M6 2.5V13.5" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+          </button>
+          <button type="button" class="rail-btn" id="rail-fit" title="Reset zoom to 100%">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2.5 6V2.5H6M10 2.5H13.5V6M13.5 10V13.5H10M6 13.5H2.5V10" stroke="currentColor" stroke-width="1.3" />
+            </svg>
+          </button>
+        </aside>
 
-      <section id="mockups-panel" class="panel mockups-panel" hidden>
-        <div class="panel-header">
-          <h2>Contextual Mockups</h2>
-          <span class="subtitle">Live browser previews from tokens and kit artifacts</span>
-        </div>
-        <div id="mockups-grid" class="mockups-grid"></div>
-      </section>
+        <aside id="left-sidebar" class="left-sidebar">
+          <div class="sidebar-head">
+            <span class="sidebar-title">Candidates</span>
+            <span id="sidebar-count" class="sidebar-meta tabular">0</span>
+          </div>
+          <div id="candidate-grid" class="candidate-grid"></div>
+        </aside>
 
-      <main id="review-stage" class="stage-grid">
-        <section class="panel stage-panel">
-          <div class="toolbar">
-            <div class="btn-group" role="group" aria-label="View mode">
-              <button type="button" class="btn btn-secondary is-active" data-view="positive">Positive</button>
-              <button type="button" class="btn btn-secondary" data-view="inverted">Inverted</button>
-              <button type="button" class="btn btn-secondary" data-view="grid">Grid</button>
-              <button type="button" class="btn btn-secondary" data-view="96">96px</button>
-              <button type="button" class="btn btn-secondary" data-view="48">48px</button>
-              <button type="button" class="btn btn-secondary" data-view="24">24px</button>
+        <main class="canvas-stage">
+          <div class="floating-toolbar" role="toolbar" aria-label="Stage view controls">
+            <div class="tool-seg" role="group" aria-label="Render mode">
+              <button type="button" class="tool-btn is-active" data-view="positive">Positive</button>
+              <button type="button" class="tool-btn" data-view="inverted">Inverted</button>
+              <button type="button" class="tool-btn" data-view="grid">Grid</button>
+              <button type="button" class="tool-btn" data-view="sheet">Sheet</button>
             </div>
-            <label class="surface-control" for="surface-hex">
-              <span>Surface</span>
+            <span class="tool-divider"></span>
+            <div class="tool-seg" role="group" aria-label="Scale test">
+              <button type="button" class="tool-btn is-active" data-scale="fit">Fit</button>
+              <button type="button" class="tool-btn tabular" data-scale="96">96px</button>
+              <button type="button" class="tool-btn tabular" data-scale="48">48px</button>
+              <button type="button" class="tool-btn tabular" data-scale="24">24px</button>
+            </div>
+            <span class="tool-divider"></span>
+            <div class="zoom-group">
+              <button type="button" class="tool-btn" id="zoom-out" aria-label="Zoom out">-</button>
+              <span id="zoom-readout" class="zoom-label tabular">100%</span>
+              <button type="button" class="tool-btn" id="zoom-in" aria-label="Zoom in">+</button>
+            </div>
+            <span class="tool-divider"></span>
+            <label class="hex-box" for="surface-hex" title="Custom background hex">
+              <span id="hex-swatch" class="hex-swatch"></span>
               <input id="surface-hex" type="text" value="" placeholder="#ffffff" maxlength="7" />
             </label>
           </div>
 
-          <div class="canvas-well" id="canvas-well">
-            <div id="canvas-frame" class="canvas-frame">
-              <img id="mark-image" alt="Compiled brand mark" draggable="false" />
-              <div id="pin-layer" class="pin-layer"></div>
+          <div id="canvas-viewport" class="canvas-viewport">
+            <div id="artboard-wrap" class="artboard-wrap">
+              <div id="canvas-frame" class="canvas-frame">
+                <img id="mark-image" alt="Compiled brand mark" draggable="false" />
+                <div id="pin-layer" class="pin-layer"></div>
+              </div>
             </div>
           </div>
 
-          <div class="metrics-bar" id="metrics-bar"></div>
-          <div class="warnings-bar" id="warnings-bar" hidden></div>
-        </section>
+          <div id="hover-coords" class="hover-coords tabular" hidden>0.00, 0.00</div>
+          <div id="metrics-dock" class="telemetry-dock"></div>
+        </main>
 
-        <aside class="panel review-panel">
-          <div class="panel-header">
-            <h2 id="candidate-title">Review</h2>
-            <span id="candidate-subtitle" class="subtitle"></span>
+        <aside class="inspector">
+          <div class="inspector-section">
+            <div class="inspector-head">
+              <h1 id="candidate-title">Mark Review</h1>
+              <p id="candidate-subtitle" class="inspector-sub"></p>
+              <div id="variant-params" class="param-chips" hidden></div>
+            </div>
           </div>
 
-          <div class="decision-row" role="group" aria-label="Review decision">
-            <button type="button" class="btn btn-secondary decision-btn" data-status="approve">Approve</button>
-            <button type="button" class="btn btn-secondary decision-btn is-active" data-status="revise">Revise</button>
-            <button type="button" class="btn btn-secondary decision-btn" data-status="reject">Reject</button>
+          <div class="inspector-section">
+            <div class="section-label-row">
+              <span class="section-label">Decision</span>
+            </div>
+            <div class="decision-grid" role="group" aria-label="Review decision">
+              <button type="button" class="decision-btn" data-status="approve">Approve</button>
+              <button type="button" class="decision-btn is-active" data-status="revise">Revise</button>
+              <button type="button" class="decision-btn" data-status="reject">Reject</button>
+            </div>
           </div>
 
-          <div class="section-block">
-            <div class="section-head">
-              <h3>Pin Comments</h3>
-              <span class="hint-text">Click canvas to pin grid coordinates</span>
+          <div class="inspector-section inspector-pins">
+            <div class="section-label-row">
+              <span class="section-label">Pin Comments <span id="pin-count" class="tabular">(0)</span></span>
+              <button type="button" id="clear-pins" class="text-btn" hidden>Clear all</button>
             </div>
             <div id="pin-list" class="pin-list"></div>
           </div>
 
-          <div class="section-block">
-            <label class="field-label" for="review-summary">Review Summary</label>
-            <textarea id="review-summary" rows="3" placeholder="Concise revision or sign-off notes"></textarea>
+          <div class="inspector-section">
+            <label class="section-label" for="review-summary">Review Summary</label>
+            <textarea id="review-summary" rows="3" placeholder="Write targeted revision or sign-off notes..."></textarea>
+            <button type="button" id="submit-review" class="btn-primary">Submit Review</button>
+            <div id="submit-status" class="submit-status"></div>
           </div>
 
-          <div class="submit-row">
-            <button type="button" id="submit-review" class="btn btn-primary">Submit Review</button>
-            <span id="submit-status" class="submit-status"></span>
-          </div>
+          <div class="inspector-accordions">
+            <details id="warnings-accordion" class="accordion" hidden>
+              <summary>
+                <span>Audit Warnings</span>
+                <span id="warnings-count" class="tabular">0</span>
+              </summary>
+              <div id="warnings-list" class="accordion-body"></div>
+            </details>
 
-          <div id="history-block" class="section-block" hidden>
-            <div class="section-head">
-              <h3>Prior Rounds</h3>
-            </div>
-            <div id="history-list" class="history-list"></div>
+            <details id="history-accordion" class="accordion" hidden>
+              <summary>
+                <span>Round History</span>
+                <span id="history-count" class="tabular">0</span>
+              </summary>
+              <div id="history-list" class="accordion-body"></div>
+            </details>
           </div>
         </aside>
-      </main>
+      </div>
+
+      <section id="mockups-panel" class="mockups-workspace" hidden>
+        <div class="mockups-inner">
+          <div class="mockups-header">
+            <h2>Contextual Mockups</h2>
+            <p>Live HTML/CSS previews rendered from tokens and exported kit assets</p>
+          </div>
+          <div id="mockups-grid" class="mockups-grid"></div>
+        </div>
+      </section>
     </div>
 
     <script src="/assets/studio.js" defer></script>
