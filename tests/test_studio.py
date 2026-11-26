@@ -72,11 +72,14 @@ def test_session_discovers_single_and_multi_candidate_dirs(tmp_path: Path) -> No
             css_text = resp.read().decode("utf-8")
         assert "monospace" not in css_text.lower()
         assert "tabular-nums" in css_text
+        assert "flex-wrap: nowrap" in css_text
 
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/assets/studio.js", timeout=5) as resp:
             js_text = resp.read().decode("utf-8")
         assert "renumberPins" in js_text
         assert "nextPinId" not in js_text
+        assert "isAwaitingAgent" in js_text
+        assert session["awaiting_agent"] is False
     finally:
         server.shutdown()
         server.server_close()

@@ -3,11 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>BrandSpec Studio</title>
+    <title>BrandSPEC</title>
     <link rel="stylesheet" href="/assets/studio.css" />
   </head>
   <body>
-    <div class="studio-shell">
+    <div id="studio-shell" class="studio-shell">
       <header class="topbar">
         <div class="topbar-left">
           <div class="brand-mark" aria-hidden="true">
@@ -18,12 +18,9 @@
             </svg>
           </div>
           <nav class="breadcrumbs" aria-label="Workspace path">
-            <span class="crumb-strong">BrandSpec</span>
+            <span class="crumb-strong">BrandSPEC</span>
             <span class="crumb-sep">/</span>
             <span id="session-dir" class="crumb-muted"></span>
-            <span class="crumb-sep">/</span>
-            <span id="active-crumb" class="crumb-strong tabular">default</span>
-            <span id="round-pill" class="pill-badge tabular">Round 1</span>
           </nav>
         </div>
 
@@ -32,8 +29,6 @@
             <button type="button" class="seg-btn is-active" data-tab="review">Review</button>
             <button type="button" class="seg-btn" data-tab="mockups">Mockups</button>
           </div>
-          <span id="candidate-count" class="topbar-stat tabular">0 candidates</span>
-          <span id="active-health" class="pill-badge tabular">PASS</span>
         </div>
       </header>
 
@@ -67,6 +62,12 @@
           </button>
           <button type="button" class="rail-btn" id="rail-fit" title="Reset zoom to 100%">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.3" />
+              <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+            </svg>
+          </button>
+          <button type="button" class="rail-btn" id="rail-fullscreen" title="Fullscreen canvas (hide sidebars)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M2.5 6V2.5H6M10 2.5H13.5V6M13.5 10V13.5H10M6 13.5H2.5V10" stroke="currentColor" stroke-width="1.3" />
             </svg>
           </button>
@@ -74,10 +75,24 @@
 
         <aside id="left-sidebar" class="left-sidebar">
           <div class="sidebar-head">
-            <span class="sidebar-title">Candidates</span>
-            <span id="sidebar-count" class="sidebar-meta tabular">0</span>
+            <div class="sidebar-title-group">
+              <span class="sidebar-title">Candidates</span>
+              <span id="sidebar-count" class="sidebar-meta tabular">0</span>
+            </div>
+            <span id="round-pill" class="pill-badge tabular">Round 1</span>
           </div>
-          <div id="candidate-grid" class="candidate-grid"></div>
+          <div id="candidate-scroll" class="candidate-scroll">
+            <div class="round-group-head">
+              <span id="round-group-label" class="round-group-title tabular">Round 1</span>
+            </div>
+            <div id="candidate-grid" class="candidate-grid"></div>
+            <div id="sidebar-history-group" class="sidebar-history-group" hidden>
+              <div class="round-group-head">
+                <span class="round-group-title">Previous Rounds</span>
+              </div>
+              <div id="sidebar-history-list" class="sidebar-history-list"></div>
+            </div>
+          </div>
         </aside>
 
         <main class="canvas-stage">
@@ -121,12 +136,11 @@
           <div id="metrics-dock" class="telemetry-dock"></div>
         </main>
 
-        <aside class="inspector">
+        <aside id="right-inspector" class="inspector">
           <div class="inspector-section">
             <div class="inspector-head">
               <h1 id="candidate-title">Mark Review</h1>
               <p id="candidate-subtitle" class="inspector-sub"></p>
-              <div id="variant-params" class="param-chips" hidden></div>
             </div>
           </div>
 
@@ -153,7 +167,7 @@
             <label class="section-label" for="review-summary">Review Summary</label>
             <textarea id="review-summary" rows="3" placeholder="Write targeted revision or sign-off notes..."></textarea>
             <button type="button" id="submit-review" class="btn-primary">Submit Review</button>
-            <div id="submit-status" class="submit-status"></div>
+            <div id="submit-error" class="submit-error" hidden></div>
           </div>
 
           <div class="inspector-accordions">

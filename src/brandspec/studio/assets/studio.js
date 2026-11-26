@@ -1,5 +1,6 @@
 (() => {
   const COS_30 = Math.cos(Math.PI / 6);
+  const SVG_NS = "http://www.w3.org/2000/svg";
 
   const state = {
     session: null,
@@ -13,20 +14,23 @@
     pins: [],
     focusedPinIndex: -1,
     leftCollapsed: false,
+    fullscreen: false,
+    pollHandle: null,
   };
 
   const el = {
+    studioShell: document.getElementById("studio-shell"),
     sessionDir: document.getElementById("session-dir"),
-    activeCrumb: document.getElementById("active-crumb"),
     roundPill: document.getElementById("round-pill"),
+    roundGroupLabel: document.getElementById("round-group-label"),
     modeTabs: document.getElementById("mode-tabs"),
-    candidateCount: document.getElementById("candidate-count"),
-    activeHealth: document.getElementById("active-health"),
     reviewWorkspace: document.getElementById("review-workspace"),
     mockupsPanel: document.getElementById("mockups-panel"),
     mockupsGrid: document.getElementById("mockups-grid"),
     sidebarCount: document.getElementById("sidebar-count"),
     candidateGrid: document.getElementById("candidate-grid"),
+    sidebarHistoryGroup: document.getElementById("sidebar-history-group"),
+    sidebarHistoryList: document.getElementById("sidebar-history-list"),
     artboardWrap: document.getElementById("artboard-wrap"),
     canvasFrame: document.getElementById("canvas-frame"),
     markImage: document.getElementById("mark-image"),
@@ -38,13 +42,12 @@
     hexSwatch: document.getElementById("hex-swatch"),
     candidateTitle: document.getElementById("candidate-title"),
     candidateSubtitle: document.getElementById("candidate-subtitle"),
-    variantParams: document.getElementById("variant-params"),
     pinCount: document.getElementById("pin-count"),
     clearPins: document.getElementById("clear-pins"),
     pinList: document.getElementById("pin-list"),
     reviewSummary: document.getElementById("review-summary"),
     submitBtn: document.getElementById("submit-review"),
-    submitStatus: document.getElementById("submit-status"),
+    submitError: document.getElementById("submit-error"),
     warningsAccordion: document.getElementById("warnings-accordion"),
     warningsCount: document.getElementById("warnings-count"),
     warningsList: document.getElementById("warnings-list"),
@@ -53,9 +56,14 @@
     historyList: document.getElementById("history-list"),
     railToggleLeft: document.getElementById("rail-toggle-left"),
     railFit: document.getElementById("rail-fit"),
+    railFullscreen: document.getElementById("rail-fullscreen"),
     zoomIn: document.getElementById("zoom-in"),
     zoomOut: document.getElementById("zoom-out"),
   };
+
+  function isAwaitingAgent() {
+    return Boolean(state.session && state.session.awaiting_agent);
+  }
 
   function renumberPins() {
     state.pins.forEach((pin, idx) => {
@@ -66,17 +74,39 @@
     }
   }
 
+  function autoResizeTextarea(textarea) {
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }
+
+  function createStatusIcon(status) {
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("width", "14");
+    svg.setAttribute("height", "14");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("fill", "none");
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "1.6");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    if (status === "approve") {
+      path.setAttribute("d", "M3.2 8.4L6.4 11.5L12.8 4.8");
+    } else if (status === "reject") {
+      path.setAttribute("d", "M4 4L12 12M12 4L4 12");
+    } else {
+      path.setAttribute("d", "M8 3.2V9.2M8 12.2V12.5");
+    }
+    svg.appendChild(path);
+    return svg;
+  }
+
   function activeCandidate() {
     if (!state.session || !state.session.candidates.length) return null;
     return (
       state.session.candidates.find((c) => c.id === state.activeId) ||
       state.session.candidates[0]
     );
-  }
-
-  function variantInfo(cid) {
-    if (!state.session || !Array.isArray(state.session.variants)) return null;
-    return state.session.variants.find((v) => v.id === cid) || null;
   }
 
   function gridToCanvasPercent(xGrid, yGrid, meta) {
@@ -138,9 +168,27 @@
     };
   }
 
+  function collectRounds() {
+    if (!state.session) return [];
+    const awaiting = isAwaitingAgent();
+    const rounds = [];
+    if (Array.isArray(state.session.history)) {
+      state.session.history.forEach((item) => {
+        rounds.push({ item, resolved: true });
+      });
+    }
+    if (state.session.latest_review) {
+      rounds.push({ item: state.session.latest_review, resolved: !awaiting });
+    }
+    return rounds;
+  }
+
   function renderCandidateGrid() {
     const candidates = state.session ? state.session.candidates : [];
+    const roundNum = (state.session && state.session.round) || 1;
     el.sidebarCount.textContent = String(candidates.length);
+    el.roundPill.textContent = `Round ${roundNum}`;
+    el.roundGroupLabel.textContent = `Round ${roundNum}`;
     el.candidateGrid.innerHTML = "";
 
     candidates.forEach((cand) => {
@@ -167,28 +215,38 @@
       btn.appendChild(thumbBox);
       btn.appendChild(metaRow);
 
-      const vInfo = variantInfo(cand.id);
-      if (vInfo && vInfo.params) {
-        const paramRow = document.createElement("div");
-        paramRow.className = "candidate-card-param tabular";
-        paramRow.textContent = Object.entries(vInfo.params)
-          .map(([k, v]) => `${k.split(".").pop()}=${v}`)
-          .join(" ");
-        btn.appendChild(paramRow);
-      }
-
       btn.addEventListener("click", () => {
         state.activeId = cand.id;
         renderAll();
       });
       el.candidateGrid.appendChild(btn);
     });
+
+    const rounds = collectRounds();
+    el.sidebarHistoryGroup.hidden = rounds.length === 0;
+    el.sidebarHistoryList.innerHTML = "";
+    rounds.forEach(({ item, resolved }) => {
+      const row = document.createElement("div");
+      row.className = "sidebar-history-row" + (resolved ? " is-resolved" : "");
+      const iconWrap = document.createElement("span");
+      iconWrap.className = "history-icon";
+      iconWrap.appendChild(createStatusIcon(item.status));
+      const label = document.createElement("span");
+      label.className = "history-text";
+      const target = item.selected_candidate ? ` · ${item.selected_candidate}` : "";
+      label.textContent = `Round ${item.round}${target}`;
+      const badge = document.createElement("span");
+      badge.textContent = item.status;
+      row.appendChild(iconWrap);
+      row.appendChild(label);
+      row.appendChild(badge);
+      el.sidebarHistoryList.appendChild(row);
+    });
   }
 
   function renderStage() {
     const cand = activeCandidate();
     if (!cand) {
-      el.activeCrumb.textContent = "none";
       el.candidateTitle.textContent = "No candidates";
       el.candidateSubtitle.textContent = "Compile a mark or sweep first.";
       el.markImage.removeAttribute("src");
@@ -196,29 +254,10 @@
       return;
     }
 
-    el.activeCrumb.textContent = cand.id;
-    const passed = cand.metrics && cand.metrics.passed;
-    el.activeHealth.textContent = passed ? "PASS" : "WARN";
-    el.activeHealth.className = "pill-badge tabular" + (passed ? " is-pass" : "");
-
     const name = (cand.meta && cand.meta.name) || cand.id;
     const concept = (cand.meta && cand.meta.concept) || "";
     el.candidateTitle.textContent = `${cand.id}: ${name}`;
     el.candidateSubtitle.textContent = concept;
-
-    const vInfo = variantInfo(cand.id);
-    el.variantParams.innerHTML = "";
-    if (vInfo && vInfo.params) {
-      el.variantParams.hidden = false;
-      Object.entries(vInfo.params).forEach(([k, v]) => {
-        const chip = document.createElement("span");
-        chip.className = "param-chip";
-        chip.textContent = `${k}=${v}`;
-        el.variantParams.appendChild(chip);
-      });
-    } else {
-      el.variantParams.hidden = true;
-    }
 
     el.artboardWrap.style.transform = `scale(${state.zoom})`;
     el.zoomReadout.textContent = `${Math.round(state.zoom * 100)}%`;
@@ -308,14 +347,17 @@
   }
 
   function renderPinList(focusNewInput = false) {
+    const locked = isAwaitingAgent();
     el.pinCount.textContent = `(${state.pins.length})`;
-    el.clearPins.hidden = state.pins.length === 0;
+    el.clearPins.hidden = locked || state.pins.length === 0;
     el.pinList.innerHTML = "";
 
     if (state.pins.length === 0) {
       const empty = document.createElement("div");
       empty.className = "pin-empty";
-      empty.textContent = "Click anywhere on the mark artboard to pin grid coordinates.";
+      empty.textContent = locked
+        ? "Review submitted. Waiting for agent update."
+        : "Click anywhere on the artboard to comment.";
       el.pinList.appendChild(empty);
       return;
     }
@@ -335,8 +377,10 @@
       removeBtn.type = "button";
       removeBtn.className = "text-btn";
       removeBtn.textContent = "Remove";
+      removeBtn.disabled = locked;
       removeBtn.addEventListener("click", (evt) => {
         evt.stopPropagation();
+        if (isAwaitingAgent()) return;
         state.pins.splice(idx, 1);
         renumberPins();
         renderAll();
@@ -345,17 +389,19 @@
       head.appendChild(title);
       head.appendChild(removeBtn);
 
-      const input = document.createElement("input");
-      input.type = "text";
-      input.className = "pin-input";
-      input.value = pin.comment;
-      input.placeholder = "Describe geometric change at this coordinate";
-      input.addEventListener("focus", () => {
+      const textarea = document.createElement("textarea");
+      textarea.rows = 1;
+      textarea.className = "pin-textarea";
+      textarea.value = pin.comment;
+      textarea.disabled = locked;
+      textarea.placeholder = "Describe geometric change at this coordinate";
+      textarea.addEventListener("focus", () => {
         state.focusedPinIndex = idx;
         renderPinsOnCanvas(activeCandidate());
       });
-      input.addEventListener("input", (evt) => {
+      textarea.addEventListener("input", (evt) => {
         pin.comment = evt.target.value;
+        autoResizeTextarea(textarea);
       });
 
       card.addEventListener("click", () => {
@@ -369,35 +415,48 @@
       });
 
       card.appendChild(head);
-      card.appendChild(input);
+      card.appendChild(textarea);
       el.pinList.appendChild(card);
+      autoResizeTextarea(textarea);
 
       if (focusNewInput && idx === state.pins.length - 1) {
-        input.focus();
+        textarea.focus();
       }
     });
   }
 
   function renderHistory() {
-    if (!state.session) return;
-    const rounds = [];
-    if (Array.isArray(state.session.history)) {
-      rounds.push(...state.session.history);
-    }
-    if (state.session.latest_review) {
-      rounds.push(state.session.latest_review);
-    }
-
+    const rounds = collectRounds();
     el.historyAccordion.hidden = rounds.length === 0;
     el.historyCount.textContent = String(rounds.length);
     el.historyList.innerHTML = "";
-    rounds.forEach((item) => {
+    rounds.forEach(({ item, resolved }) => {
       const row = document.createElement("div");
-      row.className = "history-row";
+      row.className = "history-row" + (resolved ? " is-resolved" : "");
+      const iconWrap = document.createElement("span");
+      iconWrap.className = "history-icon";
+      iconWrap.appendChild(createStatusIcon(item.status));
+
+      const textSpan = document.createElement("span");
+      textSpan.className = "history-text";
       const pinsCount = Array.isArray(item.pins) ? item.pins.length : 0;
-      row.textContent = `Round ${item.round}: ${item.status} (${pinsCount} pins) ${item.summary || ""}`.trim();
+      const summary = item.summary ? ` - ${item.summary}` : "";
+      textSpan.textContent = `Round ${item.round} (${pinsCount} pins)${summary}`;
+
+      row.appendChild(iconWrap);
+      row.appendChild(textSpan);
       el.historyList.appendChild(row);
     });
+  }
+
+  function renderReviewControls() {
+    const locked = isAwaitingAgent();
+    el.reviewSummary.disabled = locked;
+    document.querySelectorAll(".decision-btn").forEach((btn) => {
+      btn.disabled = locked;
+    });
+    el.submitBtn.disabled = locked;
+    el.submitBtn.textContent = locked ? "Waiting for agent update" : "Submit Review";
   }
 
   function renderMockups() {
@@ -433,7 +492,7 @@
       tabBar.appendChild(fav);
     }
     const tabText = document.createElement("span");
-    tabText.textContent = tokens.name || "BrandSpec";
+    tabText.textContent = tokens.name || "BrandSPEC";
     tabBar.appendChild(tabText);
 
     const navbar = document.createElement("div");
@@ -514,7 +573,25 @@
     renderStage();
     renderPinList(focusNewInput);
     renderHistory();
+    renderReviewControls();
     renderMockups();
+  }
+
+  function setFullscreen(enabled) {
+    state.fullscreen = enabled;
+    el.studioShell.classList.toggle("is-fullscreen", enabled);
+    el.railFullscreen.classList.toggle("is-active", enabled);
+  }
+
+  function ensureAgentPoll() {
+    if (isAwaitingAgent() && !state.pollHandle) {
+      state.pollHandle = window.setInterval(() => {
+        loadSession();
+      }, 2500);
+    } else if (!isAwaitingAgent() && state.pollHandle) {
+      window.clearInterval(state.pollHandle);
+      state.pollHandle = null;
+    }
   }
 
   document.querySelectorAll("[data-tab]").forEach((btn) => {
@@ -545,6 +622,7 @@
 
   document.querySelectorAll(".decision-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (isAwaitingAgent()) return;
       state.status = btn.dataset.status;
       document.querySelectorAll(".decision-btn").forEach((b) => b.classList.remove("is-active"));
       btn.classList.add("is-active");
@@ -571,8 +649,24 @@
   });
 
   el.railToggleLeft.addEventListener("click", () => {
+    if (state.fullscreen) {
+      setFullscreen(false);
+      state.leftCollapsed = false;
+      el.reviewWorkspace.classList.remove("is-left-collapsed");
+      return;
+    }
     state.leftCollapsed = !state.leftCollapsed;
     el.reviewWorkspace.classList.toggle("is-left-collapsed", state.leftCollapsed);
+  });
+
+  el.railFullscreen.addEventListener("click", () => {
+    setFullscreen(!state.fullscreen);
+  });
+
+  window.addEventListener("keydown", (evt) => {
+    if (evt.key === "Escape" && state.fullscreen) {
+      setFullscreen(false);
+    }
   });
 
   el.surfaceHex.addEventListener("input", (evt) => {
@@ -581,6 +675,7 @@
   });
 
   el.clearPins.addEventListener("click", () => {
+    if (isAwaitingAgent()) return;
     state.pins = [];
     state.focusedPinIndex = -1;
     renderAll();
@@ -606,7 +701,7 @@
 
   el.canvasFrame.addEventListener("click", (evt) => {
     const cand = activeCandidate();
-    if (!cand || state.view === "sheet" || state.scale !== "fit") return;
+    if (!cand || state.view === "sheet" || state.scale !== "fit" || isAwaitingAgent()) return;
     const rect = el.canvasFrame.getBoundingClientRect();
     const px = evt.clientX - rect.left;
     const py = evt.clientY - rect.top;
@@ -624,8 +719,10 @@
   });
 
   el.submitBtn.addEventListener("click", async () => {
+    if (isAwaitingAgent()) return;
     el.submitBtn.disabled = true;
-    el.submitStatus.textContent = "Saving review...";
+    el.submitError.hidden = true;
+    el.submitError.textContent = "";
     const cand = activeCandidate();
     renumberPins();
     try {
@@ -641,18 +738,18 @@
       });
       const body = await resp.json();
       if (!resp.ok) {
-        el.submitStatus.textContent = body.error || "Failed to save review.";
+        el.submitError.hidden = false;
+        el.submitError.textContent = body.error || "Failed to save review.";
         el.submitBtn.disabled = false;
         return;
       }
       state.pins = [];
       state.focusedPinIndex = -1;
       el.reviewSummary.value = "";
-      el.submitStatus.textContent = `Submitted Round ${body.round} (${body.status}).`;
       await loadSession();
     } catch (err) {
-      el.submitStatus.textContent = `Error: ${err.message}`;
-    } finally {
+      el.submitError.hidden = false;
+      el.submitError.textContent = `Error: ${err.message}`;
       el.submitBtn.disabled = false;
     }
   });
@@ -667,9 +764,8 @@
     const dirName = (data.dir || "").split("/").filter(Boolean).pop() || data.dir || "";
     el.sessionDir.textContent = dirName;
     el.sessionDir.title = data.dir || "";
-    el.roundPill.textContent = `Round ${data.round || 1}`;
-    el.candidateCount.textContent = `${data.candidates.length} candidate${data.candidates.length === 1 ? "" : "s"}`;
     renderAll();
+    ensureAgentPoll();
   }
 
   loadSession();

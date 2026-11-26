@@ -242,6 +242,15 @@ class StudioState:
         self.submitted_event = threading.Event()
         self.submitted_review: dict[str, Any] | None = None
 
+    def _latest_candidate_mtime(self) -> float:
+        latest = 0.0
+        for cdir in _candidate_dir_map(self.root_dir).values():
+            for fname in ("logo.svg", "meta.json"):
+                fpath = cdir / fname
+                if fpath.is_file():
+                    latest = max(latest, fpath.stat().st_mtime)
+        return latest
+
     def session_payload(self) -> dict[str, Any]:
         with self.lock:
             candidates = discover_candidates(self.root_dir)
@@ -253,12 +262,20 @@ class StudioState:
                 for name in sorted(ALLOWED_KIT_FILES)
                 if (self.root_dir / name).is_file()
             }
+            review_path = self.root_dir / "review.json"
+            latest_asset_mtime = self._latest_candidate_mtime()
+            awaiting_agent = (
+                review_path.is_file()
+                and review_state["latest_review"] is not None
+                and review_path.stat().st_mtime >= (latest_asset_mtime - 0.05)
+            )
             return {
                 "dir": str(self.root_dir),
                 "candidates": candidates,
                 "variants": variants if isinstance(variants, list) else None,
                 "tokens": tokens if isinstance(tokens, dict) else None,
                 "kit": kit_files if kit_files else None,
+                "awaiting_agent": awaiting_agent,
                 **review_state,
             }
 
