@@ -65,6 +65,8 @@ def test_session_discovers_single_and_multi_candidate_dirs(tmp_path: Path) -> No
         assert session["candidates"][0]["meta"]["unit"] == 40.0
         assert _http_status(f"http://127.0.0.1:{port}/api/candidates/default/overlay.svg") == 200
         assert _http_status(f"http://127.0.0.1:{port}/") == 200
+        assert _http_status(f"http://127.0.0.1:{port}/favicon.ico") == 200
+        assert _http_status(f"http://127.0.0.1:{port}/assets/logo.svg") == 200
         assert _http_status(f"http://127.0.0.1:{port}/assets/studio.css") == 200
         assert _http_status(f"http://127.0.0.1:{port}/assets/studio.js") == 200
 
@@ -72,6 +74,7 @@ def test_session_discovers_single_and_multi_candidate_dirs(tmp_path: Path) -> No
             html_text = resp.read().decode("utf-8")
         assert "<title>Brandspec</title>" in html_text
         assert "Brandspec</span>" in html_text
+        assert 'id="history-pending-dot"' in html_text
 
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/assets/studio.css", timeout=5) as resp:
             css_text = resp.read().decode("utf-8")
@@ -201,6 +204,24 @@ def test_post_review_writes_json_and_unblocks_wait(tmp_path: Path) -> None:
     review_v2 = json.loads((build_dir / "review.json").read_text(encoding="utf-8"))
     assert review_v2["round"] == 2
     assert review_v2["status"] == "approve"
+
+    # Rebuild Round 3 after Round 2 review and verify awaiting_agent resets + Round 2 stays snapshotted
+    assert (
+        main(["build", str(ARCHETYPES_DIR / "radial-vortex.json"), "--out-dir", str(build_dir)]) == 0
+    )
+    server, _ = create_studio_server(build_dir, port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = server.server_address[1]
+        status, sess = _http_json(f"http://127.0.0.1:{port}/api/session")
+        assert status == 200
+        assert sess["round"] == 3
+        assert sess["awaiting_agent"] is False
+        assert [g["round"] for g in sess["round_groups"]] == [2, 1]
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def test_path_traversal_rejected_and_timeout_and_port_conflict(tmp_path: Path) -> None:

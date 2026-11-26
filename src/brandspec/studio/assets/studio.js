@@ -52,6 +52,7 @@
     warningsList: document.getElementById("warnings-list"),
     railToggleLeft: document.getElementById("rail-toggle-left"),
     railFullscreen: document.getElementById("rail-fullscreen"),
+    historyPendingDot: document.getElementById("history-pending-dot"),
     zoomIn: document.getElementById("zoom-in"),
     zoomOut: document.getElementById("zoom-out"),
   };
@@ -513,6 +514,7 @@
 
   function renderReviewControls() {
     const locked = isAwaitingAgent();
+    el.historyPendingDot.hidden = !locked;
     el.reviewSummary.disabled = locked;
     document.querySelectorAll(".decision-btn").forEach((btn) => {
       btn.disabled = locked;

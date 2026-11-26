@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw
 from pydantic import BaseModel, Field, ValidationError
 import resvg_py
 
+from ...core.rounds import snapshot_prior_round_before_build
 from ...inspect import analyze_compiled
 from .artifacts import write_mark_artifacts
 from .compiler import compile_spec
@@ -220,6 +221,7 @@ def run_sweep(
         )
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_prior_round_before_build(out_dir)
     variants: list[dict[str, Any]] = []
     tiles: list[tuple[dict[str, Any], bytes | None]] = []
     emitted_idx = 0

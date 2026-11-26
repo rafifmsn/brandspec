@@ -66,16 +66,11 @@ body {
   min-width: 0;
 }
 
-.brand-mark {
+.brand-logo {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-hairline);
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   flex-shrink: 0;
 }
 
@@ -199,6 +194,7 @@ body {
 }
 
 .rail-btn {
+  position: relative;
   width: 32px;
   height: 32px;
   border-radius: 6px;
@@ -209,6 +205,16 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.rail-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #ef4444;
 }
 
 .rail-btn:hover {

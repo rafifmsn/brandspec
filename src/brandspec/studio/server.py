@@ -17,15 +17,13 @@ from urllib.parse import unquote, urlparse
 
 from ..core.grid import GridSpec, grid_overlay_svg
 from ..core.paths import render_svg_doc
+from ..core.rounds import (
+    ALLOWED_CANDIDATE_FILES,
+    ROUND_DIR_RE,
+    candidate_dir_map,
+    snapshot_round_candidates,
+)
 
-ALLOWED_CANDIDATE_FILES = {
-    "logo.svg",
-    "sheet.png",
-    "overlay.svg",
-    "metrics.json",
-    "meta.json",
-    "spec.json",
-}
 ALLOWED_KIT_FILES = {
     "tokens.spec.json",
     "tokens.css",
@@ -41,7 +39,6 @@ ALLOWED_KIT_FILES = {
 }
 VALID_STATUSES = {"approve", "revise", "reject"}
 ROUND_RE = re.compile(r"^review\.round-(\d+)\.json$")
-ROUND_DIR_RE = re.compile(r"^round-(\d+)$")
 
 
 def _load_asset(filename: str) -> tuple[bytes, str]:
@@ -63,6 +60,10 @@ def _load_asset(filename: str) -> tuple[bytes, str]:
         mime = "text/css; charset=utf-8"
     elif safe_name.endswith(".html"):
         mime = "text/html; charset=utf-8"
+    elif safe_name.endswith(".svg"):
+        mime = "image/svg+xml; charset=utf-8"
+    elif safe_name.endswith(".ico"):
+        mime = "image/x-icon"
     elif mime is None:
         mime = "application/octet-stream"
     return data, mime
@@ -133,32 +134,6 @@ def discover_candidates(
             }
         )
     return candidates
-
-
-def _candidate_dir_map(root_dir: Path) -> dict[str, Path]:
-    root = root_dir.resolve()
-    if (root / "logo.svg").is_file():
-        return {"default": root}
-    mapping: dict[str, Path] = {}
-    for child in sorted(root.iterdir(), key=lambda p: p.name):
-        if child.is_dir() and child.name != "rounds" and (child / "logo.svg").is_file():
-            mapping[child.name] = child
-    return mapping
-
-
-def _snapshot_round_candidates(root_dir: Path, round_num: int) -> None:
-    """Snapshot current candidate artifacts into rounds/round-<n>/ for branching."""
-    cdirs = _candidate_dir_map(root_dir)
-    if not cdirs:
-        return
-    round_dir = root_dir / "rounds" / f"round-{round_num}"
-    for cid, src_dir in cdirs.items():
-        dst_dir = round_dir / cid
-        dst_dir.mkdir(parents=True, exist_ok=True)
-        for fname in ALLOWED_CANDIDATE_FILES:
-            src_file = src_dir / fname
-            if src_file.is_file():
-                (dst_dir / fname).write_bytes(src_file.read_bytes())
 
 
 def discover_round_groups(root_dir: Path) -> list[dict[str, Any]]:
@@ -276,7 +251,7 @@ def _archive_and_write_review(root_dir: Path, payload: dict[str, Any]) -> dict[s
     tmp_path = root_dir / ".review.json.tmp"
     tmp_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     tmp_path.replace(review_path)
-    _snapshot_round_candidates(root_dir, next_round)
+    snapshot_round_candidates(root_dir, next_round)
     return record
 
 
@@ -291,7 +266,7 @@ class StudioState:
 
     def _latest_candidate_mtime(self) -> float:
         latest = 0.0
-        for cdir in _candidate_dir_map(self.root_dir).values():
+        for cdir in candidate_dir_map(self.root_dir).values():
             for fname in ("logo.svg", "meta.json"):
                 fpath = cdir / fname
                 if fpath.is_file():
@@ -369,6 +344,14 @@ class StudioHandler(BaseHTTPRequestHandler):
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "Studio index not found"})
             return
 
+        if req_path == "/favicon.ico":
+            try:
+                data, mime = _load_asset("favicon.ico")
+                self._send_bytes(HTTPStatus.OK, mime, data)
+            except FileNotFoundError:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "Favicon not found"})
+            return
+
         if req_path.startswith("/assets/"):
             rel = req_path[len("/assets/") :]
             if not rel or "/" in rel or "\\" in rel or ".." in rel:
@@ -398,7 +381,7 @@ class StudioHandler(BaseHTTPRequestHandler):
             if filename not in ALLOWED_CANDIDATE_FILES:
                 self._send_json(HTTPStatus.FORBIDDEN, {"error": "File type not permitted"})
                 return
-            cdirs = _candidate_dir_map(self.state.root_dir)
+            cdirs = candidate_dir_map(self.state.root_dir)
             if cid not in cdirs:
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown candidate"})
                 return
@@ -444,7 +427,7 @@ class StudioHandler(BaseHTTPRequestHandler):
             if not _is_within(self.state.root_dir, round_dir) or not round_dir.is_dir():
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown round"})
                 return
-            cdirs = _candidate_dir_map(round_dir)
+            cdirs = candidate_dir_map(round_dir)
             if cid not in cdirs:
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown round candidate"})
                 return

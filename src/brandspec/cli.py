@@ -12,6 +12,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from .core.rounds import snapshot_prior_round_before_build
 from .engines.icons.compiler import compile_icon_set
 from .engines.icons.schema import IconSetSpec
 from .engines.kit.exporter import export_kit
@@ -79,6 +80,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     compiled = compile_spec(spec)
     metrics = analyze_compiled(compiled)
     out_dir = Path(args.out_dir) if args.out_dir else spec_path.parent / "out" / spec_path.stem
+    snapshot_prior_round_before_build(out_dir)
     paths = write_mark_artifacts(spec, compiled, metrics, out_dir)
 
     print(
