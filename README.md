@@ -1,23 +1,42 @@
-# brandspec
+<p align="center">
+  <img src="./brandspec-thumb.jpg" alt="Brandspec" width="100%" />
+</p>
 
-[![CI](https://img.shields.io/github/actions/workflow/status/rafifmsn/brandspec/ci.yml?branch=main&label=CI)](https://github.com/rafifmsn/brandspec/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/brandspec)](https://pypi.org/project/brandspec/)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13-blue.svg)](pyproject.toml)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+<p align="center">
+  <a href="https://github.com/rafifmsn/brandspec/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/rafifmsn/brandspec/ci.yml?branch=main&label=CI" alt="CI" />
+  </a>
+  <a href="https://pypi.org/project/brandspec/">
+    <img src="https://img.shields.io/pypi/v/brandspec" alt="PyPI" />
+  </a>
+  <a href="./pyproject.toml">
+    <img src="https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13-blue.svg" alt="Python 3.11+" />
+  </a>
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3" />
+  </a>
+</p>
 
-`brandspec` is an agent-first deterministic brand engineering toolkit.
-Instead of letting AI agents write fragile raw SVG coordinates or guess spacing, `brandspec` pairs structured design skills and declarative JSON schemas with an exact geometry compiler and automated visual audit gate.
-The geometric and optical `mark` engine is the first module shipped in `v0.1.0`, resting on a modular core built to expand into wordmarks, lockups, matched iconography, export kits, and a localhost human-in-the-loop review UI.
+<p align="center">
+  An agent-first deterministic brand engineering toolkit. Instead of letting AI agents write fragile raw SVG coordinates or guess spacing, <code>brandspec</code> pairs structured design skills and declarative JSON schemas with an exact geometry compiler and automated visual audit gate.
+</p>
 
-![Brandspec Thumbnail](./brandspec-thumb.jpg)
+<p align="center">
+  <a href="#architecture">Architecture</a> &middot;
+  <a href="#project-layout">Project Layout</a> &middot;
+  <a href="#installation">Installation</a> &middot;
+  <a href="#specification">Specification</a> &middot;
+  <a href="#visual-audit">Visual Audit</a> &middot;
+  <a href="#archetypes">Archetypes</a> &middot;
+  <a href="#development">Development</a>
+</p>
 
 ## Architecture
 
-- **Agent Interface (`skills/brandspec/`, `cli.py`)**: Supplies agents with design construction rules, starter archetypes, deterministic build commands, and machine-readable pass/warn feedback.
-- **Core Geometry (`core/`)**: Resolves centered `square`, `isometric` (30-degree axial), and `polar` grids, builds continuous `grid_path` polylines with exact cubic Bezier corner fillets, applies symmetry, and computes outward `halo` offsets via `skia-pathops`.
-- **Mark Engine (`engines/mark/`, v0.1.0)**: Compiles constructive primitives (`grid_path`, `arc_band`, `circle`, `ring`, `rect`, `polygon`) and parametric optical effects (`line_screen`, `radial_blades`, `halftone_grid`) with `clip_to` masks, `halo`, and scoped `halo_targets`.
-- **Visual Inspection (`inspect/`)**: Rasterizes via `resvg-py` to render a 4-panel `sheet.png` and computes `metrics.json` checks via `numpy` and `pillow`.
-- **Expandable Engine Layout**: Designed so upcoming engines (`wordmark`, `lockup`, `icons`, `pattern`, `kit`, `tokens`) and an interactive localhost review surface plug into the same core and `spec.json` loop.
+- **Agent Interface (`skills/brandspec/`, `cli.py`)**: Supplies agents with design construction rules, starter archetypes, deterministic build and sweep commands, skill installation, and machine-readable pass/warn feedback.
+- **Core Geometry (`core/`)**: Resolves centered `square`, `isometric` (30-degree axial), and `polar` grids, builds continuous `grid_path` polylines with exact cubic Bezier corner fillets, applies symmetry, and computes outward `halo` offsets (`round`, `miter`, `bevel` joins) via `skia-pathops`.
+- **Engines (`engines/`)**: Includes `mark` (constructive primitives and optical effects with `clip_to` masks, `halo`, and `halo_targets`), `wordmark` (outlined font glyphs with kerning, ink traps, and stencil cuts), `lockup` (horizontal, stacked, and badge compositions), `icons` (matched `24x24` icon sets), `pattern` (3x3 seamless tiling SVG patterns), `tokens` (WCAG/APCA contrast audits and palette quantization), and `kit` (favicons, PWA icons, OG cards, and CSS tokens).
+- **Visual Inspection & Studio (`inspect/`, `studio/`)**: Rasterizes via `resvg-py` to render a 4-panel `sheet.png`, computes `metrics.json` checks via `numpy` and `pillow`, and serves an interactive localhost review console (`brandspec review` / `brandspec serve`).
 
 ## Project Layout
 
@@ -26,6 +45,10 @@ brandspec/
 ├── .github/workflows/
 │   ├── ci.yml                        # Pytest and wheel build checks
 │   └── publish.yml                   # PyPI Trusted Publishing on v* tags
+├── docs/
+│   ├── PRD.md                        # Master product requirements
+│   ├── decisions.md                  # Architecture decisions
+│   └── specs/                        # Module specifications (01-07)
 ├── LICENSE                           # GNU General Public License v3.0
 ├── pyproject.toml
 ├── skills/brandspec/SKILL.md         # Agent workflow and DSL guide
@@ -34,15 +57,29 @@ brandspec/
 │   ├── solaris-aperture.json
 │   └── vela-sails.json
 ├── src/brandspec/
-│   ├── cli.py                        # CLI commands: archetypes, init, build, check
-│   ├── core/                         # Shared grid, path, fillet, and symmetry helpers
-│   ├── engines/mark/                 # Geometric and optical mark compiler + archetypes
-│   └── inspect/                      # 4-panel sheet.png renderer and metrics gate
+│   ├── cli.py                        # CLI commands and subparsers
+│   ├── core/                         # Shared grid, path, fillet, and round helpers
+│   ├── engines/
+│   │   ├── icons/                    # Matched 24x24 icon set compiler
+│   │   ├── kit/                      # Favicon, PWA, OG card, and CSS token exporter
+│   │   ├── lockup/                   # Mark and wordmark lockup composer
+│   │   ├── mark/                     # Geometric and optical mark compiler, sweep, archetypes
+│   │   ├── pattern/                  # Seamless 3x3 tiling SVG pattern compiler
+│   │   ├── tokens/                   # WCAG/APCA contrast audit and palette extraction
+│   │   └── wordmark/                 # Outlined font glyph wordmark compiler
+│   ├── inspect/                      # 4-panel sheet.png renderer and metrics gate
+│   └── studio/                       # Localhost interactive review console
 └── tests/
-    └── test_compiler.py
+    ├── test_cli_skill.py
+    ├── test_compiler.py
+    ├── test_icons_pattern.py
+    ├── test_studio.py
+    ├── test_sweep.py
+    ├── test_tokens_kit.py
+    └── test_wordmark_lockup.py
 ```
 
-## Installation and Usage
+## Installation
 
 Requires Python 3.11 to 3.13 and [`uv`](https://docs.astral.sh/uv/).
 
@@ -95,7 +132,7 @@ npx skills add rafifmsn/brandspec
 | `brandspec pattern build <pattern.spec.json> [--out-dir <dir>]` | Compiles 3x3 periodic-wrapped seamless tiling SVG patterns. |
 | `brandspec install-skill [--target <preset-or-path>] [--force]` | Installs the bundled `SKILL.md` for AI agents (`agents`, `project`, `claude`, `cursor`, `codex`, `antigravity`, or a custom path). |
 
-## Mark Engine Specification (`spec.json`)
+## Specification
 
 All coordinates, widths, and clearances are expressed in multiples of `unit` on a centered grid origin `(0, 0)`.
 
@@ -119,9 +156,10 @@ All coordinates, widths, and clearances are expressed in multiples of `unit` on 
 Each entry in `layers` supports `op` (`unite`, `subtract`, `intersect`, `xor`), optional `clip_to` silhouette masks, and optional per-layer `symmetry` (`none`, `mirror_x`, `mirror_y`, `mirror_xy`, `rotate`, `glide_x`).
 
 Setting `"halo": 0.38` on a `unite` layer automatically dilates that layer outward and subtracts the clearance gap from earlier layers before uniting.
+Use `"halo_join"` (`"round"`, `"miter"`, `"bevel"`) and `"halo_cap"` (`"round"`, `"butt"`, `"square"`) to control offset corner and cap geometry.
 To weave bands over and under each other without cutting earlier segments of the same band, set `"halo_targets": ["<crossing-layer-id>"]` so the clearance carve applies only to the specified target layers.
 
-## Visual Audit and Metrics Gate
+## Visual Audit
 
 Every `brandspec build` outputs:
 
@@ -130,7 +168,7 @@ Every `brandspec build` outputs:
 3. `metrics.json`: Automated checks covering `ink_ratio` (target `0.16` to `0.72`), `ink_ratio_24px` (`0.06` to `0.74`), `bbox_aspect` (`<= 2.6`), `island_count`, `tiny_island_count` (`0` tolerated), and `optical_drift_pct`.
 4. `spec.json`: Locked specification for deterministic reproduction.
 
-## Bundled Archetypes and Samples
+## Archetypes
 
 | Recipe | Category | Grid | Focus |
 | :--- | :--- | :--- | :--- |
@@ -149,7 +187,3 @@ Every `brandspec build` outputs:
 uv run pytest -v
 uv build
 ```
-
-## License
-
-GNU General Public License v3.0 ([LICENSE](LICENSE)).
