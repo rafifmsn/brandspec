@@ -16,6 +16,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -727,12 +731,18 @@ body {
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
-  padding: 7px 8px;
+  line-height: 1;
+  padding: 8px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
+}
+
+.decision-btn svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .decision-btn:hover {
@@ -925,7 +935,10 @@ textarea:focus {
   word-break: break-word;
 }
 
-.history-row.is-resolved .history-title,
+.history-row.is-resolved .history-title {
+  color: var(--text-secondary);
+}
+
 .history-row.is-resolved .history-summary {
   text-decoration: line-through;
   color: var(--text-muted);

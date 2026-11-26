@@ -22,7 +22,6 @@
   const el = {
     studioShell: document.getElementById("studio-shell"),
     sessionDir: document.getElementById("session-dir"),
-    roundPill: document.getElementById("round-pill"),
     modeTabs: document.getElementById("mode-tabs"),
     reviewWorkspace: document.getElementById("review-workspace"),
     mockupsPanel: document.getElementById("mockups-panel"),
@@ -232,7 +231,6 @@
     const isHistory = state.sidebarMode === "history";
 
     el.sidebarHeading.textContent = isHistory ? "Round History" : "Candidates";
-    el.roundPill.textContent = isHistory ? `${rounds.length} logged` : `Round ${roundNum}`;
     el.candidatesPanelBody.hidden = isHistory;
     el.historyPanelBody.hidden = !isHistory;
 
@@ -314,8 +312,9 @@
         const title = document.createElement("div");
         title.className = "history-title";
         const pinsCount = Array.isArray(item.pins) ? item.pins.length : 0;
+        const pinLabel = pinsCount === 1 ? "pin" : "pins";
         const target = item.selected_candidate ? ` · ${item.selected_candidate}` : "";
-        title.textContent = `Round ${item.round}${target} (${pinsCount} pins)`;
+        title.textContent = `Round ${item.round}${target} (${pinsCount} ${pinLabel})`;
         content.appendChild(title);
 
         if (item.summary) {

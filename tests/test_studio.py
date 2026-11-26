@@ -78,6 +78,7 @@ def test_session_discovers_single_and_multi_candidate_dirs(tmp_path: Path) -> No
         assert "monospace" not in css_text.lower()
         assert "tabular-nums" in css_text
         assert "flex-wrap: nowrap" in css_text
+        assert "display: none !important" in css_text
 
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/assets/studio.js", timeout=5) as resp:
             js_text = resp.read().decode("utf-8")
