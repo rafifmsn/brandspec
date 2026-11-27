@@ -93,3 +93,15 @@ def test_wordmark_fonts_discovery_and_cli(monkeypatch, tmp_path: Path, capsys) -
     monkeypatch.setattr("brandspec.cli._default_font_dirs", lambda: [font_dir])
     assert main(["wordmark", "fonts", "--query", "space", "--json"]) == 0
     assert json.loads(capsys.readouterr().out) == [str(otf)]
+
+
+def test_review_help_documents_wait_and_round_lifecycle(capsys) -> None:
+    try:
+        main(["review", "--help"])
+    except SystemExit as exc:
+        assert exc.code == 0
+    out = capsys.readouterr().out
+    assert "review.json" in out
+    assert "rounds/round-N/" in out
+    assert "default 0, ephemeral" in out
+    assert "single POST /api/review" in out

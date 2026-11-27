@@ -65,10 +65,25 @@
     mockupAccentSwatch: document.getElementById("mockup-accent-swatch"),
     mockupRenderBtn: document.getElementById("mockup-render-btn"),
     mockupsStatus: document.getElementById("mockups-status"),
+    waitClosedLayer: document.getElementById("wait-closed-layer"),
+    waitClosedDesc: document.getElementById("wait-closed-desc"),
   };
 
   function isAwaitingAgent() {
     return Boolean(state.session && state.session.awaiting_agent);
+  }
+
+  function showWaitClosedLayer(record) {
+    if (state.pollHandle) {
+      window.clearInterval(state.pollHandle);
+      state.pollHandle = null;
+    }
+    const round = record && record.round ? `Round ${record.round}` : "Your review";
+    const status = record && record.status ? ` (${record.status})` : "";
+    el.waitClosedDesc.textContent =
+      `${round}${status} has been saved for the agent to review. ` +
+      "This session used --wait, so the local server closed automatically after submission.";
+    el.waitClosedLayer.hidden = false;
   }
 
   function renumberPins() {
@@ -938,6 +953,10 @@
       state.pins = [];
       state.focusedPinIndex = -1;
       el.reviewSummary.value = "";
+      if (body.wait_mode || (state.session && state.session.wait_mode)) {
+        showWaitClosedLayer(body);
+        return;
+      }
       await loadSession();
     } catch (err) {
       el.submitError.hidden = false;

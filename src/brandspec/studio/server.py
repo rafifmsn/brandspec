@@ -275,8 +275,9 @@ def _archive_and_write_review(root_dir: Path, payload: dict[str, Any]) -> dict[s
 class StudioState:
     """Thread-safe shared state for an active Studio HTTP session."""
 
-    def __init__(self, root_dir: Path) -> None:
+    def __init__(self, root_dir: Path, wait_mode: bool = False) -> None:
         self.root_dir = root_dir.resolve()
+        self.wait_mode = bool(wait_mode)
         self.lock = threading.Lock()
         self.submitted_event = threading.Event()
         self.submitted_review: dict[str, Any] | None = None
@@ -317,6 +318,7 @@ class StudioState:
                 "kit": kit_files if kit_files else None,
                 "has_mockup_templates": len(discover_templates()) > 0,
                 "awaiting_agent": awaiting_agent,
+                "wait_mode": self.wait_mode,
                 **review_state,
             }
 
@@ -647,7 +649,7 @@ class StudioHandler(BaseHTTPRequestHandler):
             "pins": normalized_pins,
         }
         record = self.state.save_review(clean_payload)
-        self._send_json(HTTPStatus.OK, record)
+        self._send_json(HTTPStatus.OK, {**record, "wait_mode": self.state.wait_mode})
 
 
 class StudioHTTPServer(ThreadingHTTPServer):
@@ -659,9 +661,10 @@ def create_studio_server(
     root_dir: Path,
     host: str = "127.0.0.1",
     port: int = 0,
+    wait_mode: bool = False,
 ) -> tuple[ThreadingHTTPServer, StudioState]:
     """Create a configured ThreadingHTTPServer for the studio review directory."""
-    state = StudioState(root_dir)
+    state = StudioState(root_dir, wait_mode=wait_mode)
     handler = partial(StudioHandler, state=state)
     server = StudioHTTPServer((host, port), handler)
     return server, state

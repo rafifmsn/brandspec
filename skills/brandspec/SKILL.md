@@ -66,7 +66,7 @@ Run `brandspec schema <engine>` to inspect the full JSON Schema for `mark`, `wor
   - `halftone_grid`: `center`, `cols`, `rows`, `pitch`, `shape` (`circle`, `square`, `diamond`), `min_size`, `max_size`, `field` (`radial_decay`, `radial_grow`, `linear_x`, `linear_y`, `diagonal`, `sine_ripple`).
 - **Layers (`layers[]`)**: `id`, `op` (`"unite"`, `"subtract"`, `"intersect"`, `"xor"`), `halo`, `halo_join` (`"round"`, `"miter"`, `"bevel"`), `halo_cap` (`"round"`, `"butt"`, `"square"`), `halo_targets`, `shapes`, `clip_to`, `symmetry`.
 - **Symmetry (`symmetry.type`)**: `"none"`, `"mirror_x"`, `"mirror_y"`, `"mirror_xy"`, `"rotate"` (`count`, `step_deg`, `scale_step`), `"glide_x"`.
-- **Post-process (`post`)**: `canvas_size`, `padding`, `optical_center`, `invert`, `precision`, `fill` (default `"#000000"`, or `{"type": "linear"|"radial", "angle_deg": 0, "stops": [{"offset": 0, "color": "#..."}, ...]}`).
+- **Post-process (`post`)**: `canvas_size`, `padding` (in pixels, default `100`), `optical_center`, `invert`, `precision`, `fill` (default `"#000000"`, or `{"type": "linear"|"radial", "angle_deg": 0, "stops": [{"offset": 0, "color": "#..."}, ...]}`).
 
 ## Logotypes, Lockups, and Mockups
 
@@ -79,3 +79,6 @@ Run `brandspec schema <engine>` to inspect the full JSON Schema for `mark`, `wor
 1. **Map concept to archetype**: Choose 2 to 3 distinct structural directions (e.g., an interlocking ribbon, a radial vortex, a modulated line screen, or a wordmark/lockup) that fit the brand metaphor. Run `brandspec init` or author `spec.json` drafts.
 2. **Build and inspect**: Run `brandspec build` / `wordmark build` / `lockup build` and read both `metrics.json` and `sheet.png` (using your file/image reader).
 3. **Refine once**: Check the construction grid or clearspace panel, check `metrics.json` for `warnings` (ink ratio target `0.22` to `0.55`, zero tiny islands), and check Panel 4 to ensure the silhouette reads cleanly at 24px. Adjust parameters in `spec.json`, rebuild, and deliver the final `logo.svg` + `spec.json` (and optional mockups).
+4. **Interactive review rounds (`brandspec review`)**: Run `brandspec review --dir <path/to/out> --wait` to block for a single `POST /api/review` submission and print JSON (omit `--wait` to keep Studio open across rounds).
+Each submission writes `review.json` and snapshots `rounds/round-N/` inside `--dir`.
+Advancing to Round 2 requires rebuilding into `--dir` (or clearing `review.json`).
