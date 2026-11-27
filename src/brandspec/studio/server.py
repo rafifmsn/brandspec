@@ -613,9 +613,11 @@ class StudioHandler(BaseHTTPRequestHandler):
                         break
             accent = accent or str(tokens_data.get("accent") or "#2563eb")
 
+        raw_concept = str(spec_data.get("concept") or "").strip()
+        default_headline = raw_concept if raw_concept and len(raw_concept) <= 36 else "Precision built for scale."
         ctx = MockupContext(
             brand_name=str(payload.get("brand_name") or spec_data.get("name") or "Brandspec").strip(),
-            headline=str(payload.get("headline") or spec_data.get("concept") or "Precision built for scale.").strip(),
+            headline=str(payload.get("headline") or default_headline).strip(),
             tagline=str(payload.get("tagline") or "Deterministic identity across every surface.").strip(),
             website=str(payload.get("website") or "brandspec.dev").strip(),
             accent=accent.lower(),

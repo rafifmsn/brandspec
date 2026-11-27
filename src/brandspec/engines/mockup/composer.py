@@ -19,7 +19,8 @@ TITLE_RE = re.compile(r"<title>.*?</title>", re.IGNORECASE | re.DOTALL)
 FILL_ATTR_RE = re.compile(r'\bfill="([^"]+)"')
 DEFS_BLOCK_RE = re.compile(r"<defs>.*?</defs>", re.IGNORECASE | re.DOTALL)
 
-FONT_STACK = "Liberation Sans, Noto Sans, DejaVu Sans, Arial, sans-serif"
+FONT_STACK = "Noto Sans, Liberation Sans, DejaVu Sans, sans-serif"
+DISPLAY_FONT_STACK = FONT_STACK
 
 
 @dataclass(frozen=True)
@@ -52,17 +53,48 @@ def _contrast_text(bg_hex: str, light: str = "#f9fafb", dark: str = "#111318") -
     return light if _is_dark(bg_hex) else dark
 
 
+def _shift_hex(hex_color: str, delta: int) -> str:
+    r, g, b = _hex_rgb(hex_color)
+    nr = max(0, min(255, r + delta))
+    ng = max(0, min(255, g + delta))
+    nb = max(0, min(255, b + delta))
+    return f"#{nr:02x}{ng:02x}{nb:02x}"
+
+
+def _surface_gradient_defs(base_hex: str, grad_id: str = "surf-bg") -> tuple[str, str]:
+    """Build a subtle tonal gradient so colored/dark/light surfaces never look flat."""
+    r, g, b = _hex_rgb(base_hex)
+    lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
+    if lum < 0.18:
+        c1 = _shift_hex(base_hex, 26)
+        c2 = _shift_hex(base_hex, 6)
+    elif lum > 0.82:
+        c1 = "#fafaf8"
+        c2 = "#eae8e2"
+    else:
+        c1 = _shift_hex(base_hex, 18)
+        c2 = _shift_hex(base_hex, -24)
+    defs = (
+        f'<defs><linearGradient id="{grad_id}" x1="0%" y1="0%" x2="100%" y2="100%">'
+        f'<stop offset="0%" stop-color="{c1}"/>'
+        f'<stop offset="100%" stop-color="{c2}"/>'
+        f"</linearGradient></defs>"
+    )
+    return defs, f"url(#{grad_id})"
+
+
 def _auto_mark_fill(svg_text: str, bg_hex: str) -> str | None:
-    """Return a contrast override hex if svg_text uses a single low-contrast solid fill."""
+    """Return a contrast override hex if svg_text has low contrast against bg_hex."""
+    bg_dark = _is_dark(bg_hex)
     if "linearGradient" in svg_text or "radialGradient" in svg_text:
-        return None
+        return "#f9fafb" if bg_dark else None
     fills = [m for m in FILL_ATTR_RE.findall(svg_text) if m != "none" and not m.startswith("url(")]
     if not fills:
         return _contrast_text(bg_hex)
     fill_hex = fills[0]
-    if _is_dark(bg_hex) and _is_dark(fill_hex):
+    if bg_dark and _is_dark(fill_hex):
         return "#f9fafb"
-    if not _is_dark(bg_hex) and not _is_dark(fill_hex):
+    if not bg_dark and not _is_dark(fill_hex):
         return "#111318"
     return None
 
@@ -123,16 +155,17 @@ def _svg_lines(
     font_size: float,
     line_height: float,
     fill: str,
-    weight: str = "700",
+    weight: str = "600",
     anchor: str = "start",
     letter_spacing: float = -0.02,
+    font_family: str = DISPLAY_FONT_STACK,
 ) -> str:
     parts = []
     for idx, line in enumerate(lines):
         ly = y + idx * line_height
         parts.append(
             f'<text x="{x:.1f}" y="{ly:.1f}" fill="{fill}" '
-            f'font-family="{FONT_STACK}" font-size="{font_size:.1f}" '
+            f'font-family="{font_family}" font-size="{font_size:.1f}" '
             f'font-weight="{weight}" text-anchor="{anchor}" '
             f'letter-spacing="{letter_spacing}em">{escape(line)}</text>'
         )
@@ -173,10 +206,12 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
     if style == "card_editorial":
         bg = ctx.accent
         fg = _contrast_text(bg, ctx.text_light, ctx.text_dark)
+        s_defs, s_fill = _surface_gradient_defs(bg, "card-grad")
         mark_s = h * 0.28
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
-            f'<rect width="{w}" height="{h}" fill="{bg}"/>'
+            f"{s_defs}"
+            f'<rect width="{w}" height="{h}" fill="{s_fill}"/>'
             f"{_nested_mark(logo_svg, 0.5 * w - mark_s * 0.5, h * 0.22, mark_s, mono_fill=fg)}"
             f'<text x="{0.5 * w:.1f}" y="{h * 0.67:.1f}" fill="{fg}" '
             f'font-family="{FONT_STACK}" font-size="{h * 0.135:.1f}" font-weight="700" '
@@ -205,11 +240,13 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
     if style == "banner_vertical":
         bg = ctx.accent
         fg = _contrast_text(bg, ctx.text_light, ctx.text_dark)
+        s_defs, s_fill = _surface_gradient_defs(bg, "banner-grad")
         mark_s = w * 0.56
         lines = _wrap_lines(ctx.headline, max_chars=14, max_lines=3)
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
-            f'<rect width="{w}" height="{h}" fill="{bg}"/>'
+            f"{s_defs}"
+            f'<rect width="{w}" height="{h}" fill="{s_fill}"/>'
             f'<text x="{w * 0.10:.1f}" y="{h * 0.09:.1f}" fill="{fg}" fill-opacity="0.82" '
             f'font-family="{FONT_STACK}" font-size="{w * 0.055:.1f}" font-weight="700" '
             f'letter-spacing="0.06em">{escape(ctx.brand_name.upper())}</text>'
@@ -225,17 +262,28 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
         is_wide = (w / max(1, h)) >= 3.0
         bg = ctx.surface_light if is_wide else ctx.accent
         fg = _contrast_text(bg, ctx.text_light, ctx.text_dark)
+        s_defs, s_fill = _surface_gradient_defs(bg, "bb-grad")
         mark_fill = _auto_mark_fill(logo_svg, bg) if bg == ctx.surface_light else fg
         pad_x = w * 0.06
-        mark_s = h * (0.58 if is_wide else 0.50)
-        lines = _wrap_lines(ctx.headline, max_chars=26 if is_wide else 20, max_lines=3)
-        font_sz = min(h * 0.132, w * 0.050) if not is_wide else h * 0.19
+        mark_s = h * (0.56 if is_wide else 0.48)
+        char_len = max(1, len(ctx.headline.strip()))
+        max_chars = (28 if is_wide else 22) if char_len <= 34 else (34 if is_wide else 28)
+        lines = _wrap_lines(ctx.headline, max_chars=max_chars, max_lines=3)
+        base_sz = min(h * 0.130, w * 0.048) if not is_wide else h * 0.175
+        if len(lines) >= 3 or char_len > 36:
+            base_sz *= 0.78
+        elif len(lines) == 2 and char_len > 24:
+            base_sz *= 0.90
+        line_h = base_sz * 1.16
+        block_h = len(lines) * line_h
+        start_y = max(h * 0.24, 0.44 * h - 0.5 * block_h + base_sz * 0.85)
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
-            f'<rect width="{w}" height="{h}" fill="{bg}"/>'
-            f"{_svg_lines(lines, pad_x, h * 0.36, font_sz, font_sz * 1.16, fg)}"
-            f'<text x="{pad_x:.1f}" y="{h * 0.84:.1f}" fill="{fg}" fill-opacity="0.78" '
-            f'font-family="{FONT_STACK}" font-size="{h * 0.060:.1f}" font-weight="600">'
+            f"{s_defs}"
+            f'<rect width="{w}" height="{h}" fill="{s_fill}"/>'
+            f"{_svg_lines(lines, pad_x, start_y, base_sz, line_h, fg, weight='500')}"
+            f'<text x="{pad_x:.1f}" y="{h * 0.86:.1f}" fill="{fg}" fill-opacity="0.76" '
+            f'font-family="{FONT_STACK}" font-size="{h * 0.056:.1f}" font-weight="500">'
             f"{escape(ctx.brand_name)}  ·  {escape(ctx.website)}</text>"
             f"{_nested_mark(logo_svg, w - pad_x - mark_s, 0.5 * (h - mark_s), mark_s, mono_fill=mark_fill)}"
             f"</svg>"

@@ -145,47 +145,6 @@
             </div>
           </div>
 
-          <div class="inspector-section" id="fill-section">
-            <div class="section-label-row">
-              <span class="section-label">Fill &amp; Gradient</span>
-              <div class="fill-mode-seg" role="group" aria-label="Fill mode">
-                <button type="button" class="fill-mode-btn is-active" data-fill-mode="solid">Solid</button>
-                <button type="button" class="fill-mode-btn" data-fill-mode="linear">Linear</button>
-                <button type="button" class="fill-mode-btn" data-fill-mode="radial">Radial</button>
-              </div>
-            </div>
-
-            <div id="fill-solid-panel" class="fill-panel">
-              <div class="fill-color-row">
-                <input type="color" id="fill-solid-picker" value="#000000" aria-label="Solid fill color" />
-                <input type="text" id="fill-solid-hex" value="#000000" maxlength="7" spellcheck="false" aria-label="Solid fill hex" />
-              </div>
-            </div>
-
-            <div id="fill-gradient-panel" class="fill-panel" hidden>
-              <div id="grad-bar-wrap" class="grad-bar-wrap" title="Click bar to add stop; click handle to select">
-                <div id="grad-bar" class="grad-bar"></div>
-                <div id="grad-handles" class="grad-handles"></div>
-              </div>
-              <div id="grad-angle-row" class="grad-angle-row">
-                <span class="fill-sub-label">Angle</span>
-                <input type="range" id="grad-angle-range" min="0" max="360" step="1" value="0" />
-                <span id="grad-angle-val" class="tabular fill-sub-val">0°</span>
-              </div>
-              <div class="fill-color-row">
-                <input type="color" id="grad-stop-picker" value="#000000" aria-label="Selected stop color" />
-                <input type="text" id="grad-stop-hex" value="#000000" maxlength="7" spellcheck="false" aria-label="Selected stop hex" />
-                <span id="grad-stop-offset" class="tabular fill-sub-val">0%</span>
-                <button type="button" id="grad-remove-stop" class="text-btn" title="Remove selected stop">Remove</button>
-              </div>
-            </div>
-
-            <div class="fill-actions-row">
-              <button type="button" id="fill-apply-btn" class="btn-secondary">Apply Fill</button>
-              <span id="fill-status" class="fill-status"></span>
-            </div>
-          </div>
-
           <div class="inspector-section inspector-pins">
             <div class="section-label-row">
               <span class="section-label">Pin Comments <span id="pin-count" class="tabular">(0)</span></span>
@@ -224,7 +183,10 @@
               <input id="mockup-brand-name" type="text" placeholder="Brand name" aria-label="Brand name" />
               <input id="mockup-headline" type="text" placeholder="Headline" aria-label="Headline" />
               <input id="mockup-website" type="text" placeholder="Website" aria-label="Website" />
-              <input id="mockup-accent" type="color" value="#2563eb" title="Brand accent" aria-label="Brand accent" />
+              <label class="hex-box" for="mockup-accent" title="Brand accent hex">
+                <span id="mockup-accent-swatch" class="hex-swatch"></span>
+                <input id="mockup-accent" type="text" value="#2563eb" placeholder="#2563eb" maxlength="7" spellcheck="false" aria-label="Brand accent hex" />
+              </label>
               <button type="button" id="mockup-render-btn" class="btn-secondary">Render Mockups</button>
             </div>
           </div>

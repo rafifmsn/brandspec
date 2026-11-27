@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 from .composer import MockupContext, render_slot_design
 from .schema import MockupManifest, MockupSlot
@@ -75,7 +75,7 @@ def _slot_coverage_mask(
         Image.Transform.PERSPECTIVE,
         coeffs,
         resample=Image.Resampling.BILINEAR,
-    )
+    ).filter(ImageFilter.GaussianBlur(radius=2.2))
     return np.asarray(warped, dtype=np.float32) / 255.0
 
 

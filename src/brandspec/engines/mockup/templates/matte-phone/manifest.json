@@ -7,12 +7,12 @@
   "slots": [
     {
       "id": "main",
-      "quad": [[752, 166], [1030, 307], [446, 711], [176, 509]],
+      "quad": [[742, 152], [1044, 304], [446, 725], [156, 512]],
       "design_size": [600, 1300],
       "template_style": "phone_splash",
       "blend_mode": "normal",
-      "opacity": 0.93,
-      "corner_radius": 92
+      "opacity": 0.95,
+      "corner_radius": 110
     }
   ]
 }

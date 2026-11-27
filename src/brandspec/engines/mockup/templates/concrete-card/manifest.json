@@ -7,11 +7,11 @@
   "slots": [
     {
       "id": "main",
-      "quad": [[214, 408], [718, 180], [1006, 364], [482, 644]],
+      "quad": [[206, 404], [718, 174], [1012, 362], [482, 650]],
       "design_size": [1050, 600],
       "template_style": "card_editorial",
       "blend_mode": "luminance_transfer",
-      "opacity": 0.97
+      "opacity": 0.96
     }
   ]
 }

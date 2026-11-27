@@ -20,17 +20,6 @@
     assetBust: 0,
     mockupDefaultsForId: null,
     mockupRendering: false,
-    fill: {
-      mode: "solid",
-      solidColor: "#000000",
-      angle: 0,
-      stops: [
-        { offset: 0, color: "#000000" },
-        { offset: 1, color: "#3b82f6" },
-      ],
-      selectedStop: 0,
-      loadedForId: null,
-    },
   };
 
   const el = {
@@ -69,26 +58,11 @@
     historyPendingDot: document.getElementById("history-pending-dot"),
     zoomIn: document.getElementById("zoom-in"),
     zoomOut: document.getElementById("zoom-out"),
-    fillSolidPanel: document.getElementById("fill-solid-panel"),
-    fillGradientPanel: document.getElementById("fill-gradient-panel"),
-    fillSolidPicker: document.getElementById("fill-solid-picker"),
-    fillSolidHex: document.getElementById("fill-solid-hex"),
-    gradBarWrap: document.getElementById("grad-bar-wrap"),
-    gradBar: document.getElementById("grad-bar"),
-    gradHandles: document.getElementById("grad-handles"),
-    gradAngleRow: document.getElementById("grad-angle-row"),
-    gradAngleRange: document.getElementById("grad-angle-range"),
-    gradAngleVal: document.getElementById("grad-angle-val"),
-    gradStopPicker: document.getElementById("grad-stop-picker"),
-    gradStopHex: document.getElementById("grad-stop-hex"),
-    gradStopOffset: document.getElementById("grad-stop-offset"),
-    gradRemoveStop: document.getElementById("grad-remove-stop"),
-    fillApplyBtn: document.getElementById("fill-apply-btn"),
-    fillStatus: document.getElementById("fill-status"),
     mockupBrandName: document.getElementById("mockup-brand-name"),
     mockupHeadline: document.getElementById("mockup-headline"),
     mockupWebsite: document.getElementById("mockup-website"),
     mockupAccent: document.getElementById("mockup-accent"),
+    mockupAccentSwatch: document.getElementById("mockup-accent-swatch"),
     mockupRenderBtn: document.getElementById("mockup-render-btn"),
     mockupsStatus: document.getElementById("mockups-status"),
   };
@@ -412,100 +386,8 @@
       el.markImage.src = cand.files.logo_svg + bust;
     }
 
-    syncFillFromCandidate(cand);
     renderMetrics(cand.metrics);
     renderPinsOnCanvas(cand);
-  }
-
-  function syncFillFromCandidate(cand) {
-    if (!cand || state.fill.loadedForId === cand.id) return;
-    state.fill.loadedForId = cand.id;
-    const rawFill = cand.spec && cand.spec.post && cand.spec.post.fill;
-    if (typeof rawFill === "string" && /^#[0-9a-fA-F]{6}$/.test(rawFill)) {
-      state.fill.mode = "solid";
-      state.fill.solidColor = rawFill.toLowerCase();
-    } else if (rawFill && typeof rawFill === "object" && Array.isArray(rawFill.stops) && rawFill.stops.length >= 2) {
-      state.fill.mode = rawFill.type === "radial" ? "radial" : "linear";
-      state.fill.angle = Number.isFinite(rawFill.angle_deg) ? Math.round(rawFill.angle_deg) : 0;
-      state.fill.stops = rawFill.stops.map((s) => ({
-        offset: Math.max(0, Math.min(1, Number(s.offset) || 0)),
-        color: /^#[0-9a-fA-F]{6}$/.test(s.color || "") ? s.color.toLowerCase() : "#000000",
-      }));
-      state.fill.selectedStop = 0;
-    } else {
-      state.fill.mode = "solid";
-      state.fill.solidColor = "#000000";
-    }
-    el.fillStatus.textContent = "";
-    renderFillControls();
-  }
-
-  function renderFillControls() {
-    const f = state.fill;
-    document.querySelectorAll("[data-fill-mode]").forEach((btn) => {
-      btn.classList.toggle("is-active", btn.dataset.fillMode === f.mode);
-    });
-    const isSolid = f.mode === "solid";
-    el.fillSolidPanel.hidden = !isSolid;
-    el.fillGradientPanel.hidden = isSolid;
-    if (isSolid) {
-      el.fillSolidPicker.value = f.solidColor;
-      el.fillSolidHex.value = f.solidColor;
-      return;
-    }
-
-    el.gradAngleRow.hidden = f.mode === "radial";
-    el.gradAngleRange.value = String(f.angle);
-    el.gradAngleVal.textContent = `${f.angle}°`;
-
-    const sorted = f.stops.slice().sort((a, b) => a.offset - b.offset);
-    const stopStr = sorted.map((s) => `${s.color} ${Math.round(s.offset * 100)}%`).join(", ");
-    el.gradBar.style.background = `linear-gradient(90deg, ${stopStr})`;
-
-    el.gradHandles.innerHTML = "";
-    f.stops.forEach((stop, idx) => {
-      const handle = document.createElement("div");
-      handle.className = "grad-handle" + (idx === f.selectedStop ? " is-active" : "");
-      handle.style.left = `${Math.round(stop.offset * 100)}%`;
-      handle.style.background = stop.color;
-      handle.addEventListener("pointerdown", (evt) => {
-        evt.stopPropagation();
-        f.selectedStop = idx;
-        renderFillControls();
-        const barRect = el.gradBarWrap.getBoundingClientRect();
-        const onMove = (moveEvt) => {
-          const ratio = Math.max(0, Math.min(1, (moveEvt.clientX - barRect.left) / Math.max(1, barRect.width)));
-          f.stops[idx].offset = Math.round(ratio * 100) / 100;
-          renderFillControls();
-        };
-        const onUp = () => {
-          window.removeEventListener("pointermove", onMove);
-          window.removeEventListener("pointerup", onUp);
-        };
-        window.addEventListener("pointermove", onMove);
-        window.addEventListener("pointerup", onUp);
-      });
-      el.gradHandles.appendChild(handle);
-    });
-
-    const active = f.stops[f.selectedStop] || f.stops[0];
-    el.gradStopPicker.value = active.color;
-    el.gradStopHex.value = active.color;
-    el.gradStopOffset.textContent = `${Math.round(active.offset * 100)}%`;
-    el.gradRemoveStop.disabled = f.stops.length <= 2;
-  }
-
-  function buildFillPayload() {
-    const f = state.fill;
-    if (f.mode === "solid") return f.solidColor;
-    return {
-      type: f.mode,
-      angle_deg: f.angle,
-      stops: f.stops
-        .slice()
-        .sort((a, b) => a.offset - b.offset)
-        .map((s) => ({ offset: s.offset, color: s.color })),
-    };
   }
 
   function renderMetrics(metrics) {
@@ -658,7 +540,9 @@
     const spec = cand.spec || {};
     const tokens = (state.session && state.session.tokens) || {};
     el.mockupBrandName.value = spec.name || tokens.name || "Brandspec";
-    el.mockupHeadline.value = spec.concept || "Precision built for scale.";
+    const rawConcept = String(spec.concept || "").trim();
+    el.mockupHeadline.value =
+      rawConcept && rawConcept.length <= 36 ? rawConcept : "Precision built for scale.";
     if (!el.mockupWebsite.value) {
       el.mockupWebsite.value = "brandspec.dev";
     }
@@ -672,6 +556,7 @@
     }
     if (/^#[0-9a-fA-F]{6}$/.test(accent)) {
       el.mockupAccent.value = accent.toLowerCase();
+      el.mockupAccentSwatch.style.background = accent.toLowerCase();
     }
   }
 
@@ -737,41 +622,28 @@
 
     const bust = state.assetBust ? `?v=${state.assetBust}` : "";
     scenes.forEach((scene) => {
-      const card = document.createElement("div");
-      card.className = "mockup-card";
-
-      const head = document.createElement("div");
-      head.className = "mockup-scene-head";
-
-      const meta = document.createElement("div");
-      meta.className = "mockup-scene-meta";
-      const title = document.createElement("div");
-      title.className = "mockup-title";
-      title.textContent = scene.title;
-      const badge = document.createElement("span");
-      badge.className = "mockup-badge";
-      badge.textContent = scene.category;
-      meta.appendChild(title);
-      meta.appendChild(badge);
-
-      const dl = document.createElement("a");
-      dl.className = "mockup-download";
-      dl.href = scene.url + bust;
-      dl.download = `${cand.id}-${scene.id}.jpg`;
-      dl.textContent = "Download";
-
-      head.appendChild(meta);
-      head.appendChild(dl);
+      const tile = document.createElement("div");
+      tile.className = "mockup-tile";
 
       const img = document.createElement("img");
       img.className = "mockup-scene-img";
       img.src = scene.url + bust;
       img.alt = scene.title;
+      img.title = scene.title;
       img.loading = "lazy";
 
-      card.appendChild(head);
-      card.appendChild(img);
-      el.mockupsGrid.appendChild(card);
+      const dl = document.createElement("a");
+      dl.className = "mockup-download-btn";
+      dl.href = scene.url + bust;
+      dl.download = `${cand.id}-${scene.id}.jpg`;
+      dl.innerHTML =
+        '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
+        '<path d="M8 2.5V10.5M8 10.5L4.8 7.3M8 10.5L11.2 7.3M3 13.5H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+        "</svg><span>Download</span>";
+
+      tile.appendChild(img);
+      tile.appendChild(dl);
+      el.mockupsGrid.appendChild(tile);
     });
 
     const kit = state.session.kit || {};
@@ -1028,88 +900,10 @@
     renderAll(true);
   });
 
-  document.querySelectorAll("[data-fill-mode]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.fill.mode = btn.dataset.fillMode;
-      renderFillControls();
-    });
-  });
-
-  el.fillSolidPicker.addEventListener("input", () => {
-    state.fill.solidColor = el.fillSolidPicker.value.toLowerCase();
-    el.fillSolidHex.value = state.fill.solidColor;
-  });
-
-  el.fillSolidHex.addEventListener("input", () => {
-    const val = el.fillSolidHex.value.trim();
+  el.mockupAccent.addEventListener("input", () => {
+    const val = el.mockupAccent.value.trim();
     if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-      state.fill.solidColor = val.toLowerCase();
-      el.fillSolidPicker.value = state.fill.solidColor;
-    }
-  });
-
-  el.gradAngleRange.addEventListener("input", () => {
-    state.fill.angle = Number(el.gradAngleRange.value) || 0;
-    el.gradAngleVal.textContent = `${state.fill.angle}°`;
-  });
-
-  el.gradBarWrap.addEventListener("click", (evt) => {
-    if (evt.target.classList.contains("grad-handle")) return;
-    const rect = el.gradBarWrap.getBoundingClientRect();
-    const offset = Math.round(Math.max(0, Math.min(1, (evt.clientX - rect.left) / Math.max(1, rect.width))) * 100) / 100;
-    const active = state.fill.stops[state.fill.selectedStop] || state.fill.stops[0];
-    state.fill.stops.push({ offset, color: active.color });
-    state.fill.selectedStop = state.fill.stops.length - 1;
-    renderFillControls();
-  });
-
-  el.gradStopPicker.addEventListener("input", () => {
-    const stop = state.fill.stops[state.fill.selectedStop];
-    if (!stop) return;
-    stop.color = el.gradStopPicker.value.toLowerCase();
-    renderFillControls();
-  });
-
-  el.gradStopHex.addEventListener("input", () => {
-    const val = el.gradStopHex.value.trim();
-    const stop = state.fill.stops[state.fill.selectedStop];
-    if (stop && /^#[0-9a-fA-F]{6}$/.test(val)) {
-      stop.color = val.toLowerCase();
-      renderFillControls();
-    }
-  });
-
-  el.gradRemoveStop.addEventListener("click", () => {
-    if (state.fill.stops.length <= 2) return;
-    state.fill.stops.splice(state.fill.selectedStop, 1);
-    state.fill.selectedStop = Math.max(0, state.fill.selectedStop - 1);
-    renderFillControls();
-  });
-
-  el.fillApplyBtn.addEventListener("click", async () => {
-    const cand = activeCandidate();
-    if (!cand || isAwaitingAgent()) return;
-    el.fillApplyBtn.disabled = true;
-    el.fillStatus.textContent = "Applying...";
-    try {
-      const resp = await fetch("/api/candidate/fill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidate_id: cand.id, fill: buildFillPayload() }),
-      });
-      const body = await resp.json();
-      if (!resp.ok) {
-        el.fillStatus.textContent = body.error || "Failed";
-        return;
-      }
-      state.assetBust = Date.now();
-      state.fill.loadedForId = null;
-      el.fillStatus.textContent = "Saved";
-      await loadSession();
-    } catch (err) {
-      el.fillStatus.textContent = err.message;
-    } finally {
-      el.fillApplyBtn.disabled = false;
+      el.mockupAccentSwatch.style.background = val.toLowerCase();
     }
   });
 

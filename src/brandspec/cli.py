@@ -585,9 +585,11 @@ def cmd_mockup_build(args: argparse.Namespace) -> int:
         or _extract_accent_from_spec(spec_data)
         or "#2563eb"
     )
+    raw_concept = str(spec_data.get("concept") or "").strip()
+    default_headline = raw_concept if raw_concept and len(raw_concept) <= 36 else "Precision built for scale."
     ctx = MockupContext(
         brand_name=args.brand_name or spec_data.get("name") or tokens_data.get("name") or "Brandspec",
-        headline=args.headline or spec_data.get("concept") or "Precision built for scale.",
+        headline=args.headline or default_headline,
         tagline=args.tagline or "Deterministic identity across every surface.",
         website=args.website or "brandspec.dev",
         accent=accent,
