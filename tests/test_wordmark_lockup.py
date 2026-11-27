@@ -171,3 +171,61 @@ def test_lockup_respects_clearspace_and_layout_bounds(tmp_path: Path) -> None:
     assert main(["lockup", "build", str(horiz_path), "--out-dir", str(lockup_out)]) == 0
     assert (lockup_out / "lockup.svg").is_file()
     assert (lockup_out / "lockup-clearspace.svg").is_file()
+    assert (lockup_out / "sheet.png").is_file()
+
+
+def test_lockup_optical_alignment_nudges_and_multi_fill(tmp_path: Path) -> None:
+    font_file = _build_fixture_ttf(tmp_path / "test-geom.ttf")
+    wm_spec_path = tmp_path / "wordmark.spec.json"
+    wm_spec_path.write_text(
+        json.dumps(
+            {
+                "name": "Avi",
+                "text": "AVI",
+                "font_path": str(font_file),
+                "unit": 40.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cap_lockup = compile_lockup(
+        LockupSpec.model_validate(
+            {
+                "name": "Avi Cap",
+                "mark_spec": str(ARCHETYPES_DIR / "ribbon-weave.json"),
+                "wordmark_spec": str(wm_spec_path),
+                "layout": "horizontal",
+                "align": "cap_height",
+                "offset_x_u": 0.2,
+                "offset_y_u": -0.1,
+                "mark_fill": {
+                    "type": "linear",
+                    "angle_deg": 45,
+                    "stops": [
+                        {"offset": 0.0, "color": "#2563eb"},
+                        {"offset": 1.0, "color": "#06b6d4"},
+                    ],
+                },
+                "wordmark_fill": "#111827",
+            }
+        ),
+        base_dir=tmp_path,
+    )
+    assert '<linearGradient id="lockup-mark-fill"' in cap_lockup.svg_markup
+    assert 'fill="url(#lockup-mark-fill)"' in cap_lockup.svg_markup
+    assert 'fill="#111827"' in cap_lockup.svg_markup
+
+    optical_lockup = compile_lockup(
+        LockupSpec.model_validate(
+            {
+                "name": "Avi Optical",
+                "mark_spec": str(ARCHETYPES_DIR / "ribbon-weave.json"),
+                "wordmark_spec": str(wm_spec_path),
+                "layout": "horizontal",
+                "align": "optical_center",
+            }
+        ),
+        base_dir=tmp_path,
+    )
+    assert optical_lockup.wordmark_bounds_svg != cap_lockup.wordmark_bounds_svg

@@ -23,6 +23,7 @@ from ..core.rounds import (
     candidate_dir_map,
     snapshot_round_candidates,
 )
+from ..engines.mockup import MockupContext, discover_templates, render_all_mockups
 
 ALLOWED_KIT_FILES = {
     "tokens.spec.json",
@@ -113,6 +114,21 @@ def discover_candidates(
             and "affine" in meta
             and "unit" in meta
         )
+        mockups_list: list[dict[str, str]] = []
+        mockups_dir = cdir / "mockups"
+        if mockups_dir.is_dir():
+            for _tdir, manifest in discover_templates():
+                mfile = mockups_dir / f"{manifest.id}.jpg"
+                if mfile.is_file():
+                    mockups_list.append(
+                        {
+                            "id": manifest.id,
+                            "title": manifest.title,
+                            "category": manifest.category,
+                            "url": f"{url_base}/{raw_cid}/mockups/{mfile.name}",
+                        }
+                    )
+
         candidates.append(
             {
                 "id": cid,
@@ -131,6 +147,7 @@ def discover_candidates(
                         f"{url_base}/{raw_cid}/overlay.svg" if has_overlay else None
                     ),
                 },
+                "mockups": mockups_list,
             }
         )
     return candidates
@@ -298,6 +315,7 @@ class StudioState:
                 "variants": variants if isinstance(variants, list) else None,
                 "tokens": tokens if isinstance(tokens, dict) else None,
                 "kit": kit_files if kit_files else None,
+                "has_mockup_templates": len(discover_templates()) > 0,
                 "awaiting_agent": awaiting_agent,
                 **review_state,
             }
@@ -374,6 +392,20 @@ class StudioHandler(BaseHTTPRequestHandler):
                 self._send_json(HTTPStatus.FORBIDDEN, {"error": "Path traversal rejected"})
                 return
             parts = rest.split("/")
+            if len(parts) == 3 and parts[1] == "mockups" and parts[0] and parts[2]:
+                cid, fname = parts[0], parts[2]
+                cdirs = candidate_dir_map(self.state.root_dir)
+                if cid not in cdirs or not fname.endswith((".jpg", ".png")):
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": "Mockup not found"})
+                    return
+                mockups_root = (cdirs[cid] / "mockups").resolve()
+                target = (mockups_root / fname).resolve()
+                if not _is_within(self.state.root_dir, target) or not _is_within(mockups_root, target) or not target.is_file():
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": "Mockup file not found"})
+                    return
+                mime = "image/jpeg" if target.suffix == ".jpg" else "image/png"
+                self._send_bytes(HTTPStatus.OK, mime, target.read_bytes())
+                return
             if len(parts) != 2 or not parts[0] or not parts[1]:
                 self._send_json(HTTPStatus.NOT_FOUND, {"error": "Invalid candidate path"})
                 return
@@ -483,30 +515,92 @@ class StudioHandler(BaseHTTPRequestHandler):
 
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "Route not found"})
 
-    def do_POST(self) -> None:
-        parsed = urlparse(self.path)
-        if parsed.path != "/api/review":
-            self._send_json(HTTPStatus.NOT_FOUND, {"error": "Route not found"})
-            return
-
+    def _read_json_body(self) -> dict[str, Any] | None:
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid Content-Length"})
-            return
+            return None
         if length <= 0 or length > 2_000_000:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid payload size"})
-            return
+            return None
 
         try:
             raw = self.rfile.read(length)
             payload = json.loads(raw.decode("utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"Invalid JSON: {exc}"})
-            return
+            return None
 
         if not isinstance(payload, dict):
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Expected JSON object"})
+            return None
+        return payload
+
+    def _handle_mockups_render(self, payload: dict[str, Any]) -> None:
+        cid = str(payload.get("candidate_id") or "default")
+        cdirs = candidate_dir_map(self.state.root_dir)
+        if cid not in cdirs:
+            self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown candidate"})
+            return
+        cdir = cdirs[cid]
+        svg_path = cdir / "logo.svg"
+        if not svg_path.is_file():
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Candidate has no logo.svg"})
+            return
+
+        logo_svg = svg_path.read_text(encoding="utf-8")
+        spec_data = _read_json_if_exists(cdir / "spec.json") or {}
+        tokens_data = _read_json_if_exists(self.state.root_dir / "tokens.spec.json") or {}
+
+        accent = str(payload.get("accent") or "").strip()
+        if not re.match(r"^#[0-9a-fA-F]{6}$", accent):
+            fill = spec_data.get("post", {}).get("fill") if isinstance(spec_data, dict) else None
+            if isinstance(fill, str) and fill.lower() not in {"#000000", "#111111", "#ffffff"}:
+                accent = fill
+            elif isinstance(fill, dict):
+                for stop in fill.get("stops", []):
+                    c = str(stop.get("color", "")).lower()
+                    if c and c not in {"#000000", "#111111", "#ffffff"}:
+                        accent = c
+                        break
+            accent = accent or str(tokens_data.get("accent") or "#525252")
+
+        raw_concept = str(spec_data.get("concept") or "").strip()
+        default_headline = raw_concept if raw_concept and len(raw_concept) <= 36 else "Precision built for scale."
+        ctx = MockupContext(
+            brand_name=str(payload.get("brand_name") or spec_data.get("name") or "Brandspec").strip(),
+            headline=str(payload.get("headline") or default_headline).strip(),
+            tagline=str(payload.get("tagline") or "Deterministic identity across every surface.").strip(),
+            website=str(payload.get("website") or "brandspec.com").strip(),
+            accent=accent.lower(),
+            surface_dark=str(tokens_data.get("bg_canvas") or "#111318"),
+            text_light=str(tokens_data.get("text_primary") or "#f9fafb"),
+        )
+        records = render_all_mockups(logo_svg, cdir / "mockups", ctx=ctx)
+        items = [
+            {
+                "id": rec["id"],
+                "title": rec["title"],
+                "category": rec["category"],
+                "url": f"/api/candidates/{cid}/mockups/{rec['file']}",
+            }
+            for rec in records
+        ]
+        self._send_json(HTTPStatus.OK, {"candidate_id": cid, "mockups": items})
+
+    def do_POST(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path not in {"/api/review", "/api/mockups/render"}:
+            self._send_json(HTTPStatus.NOT_FOUND, {"error": "Route not found"})
+            return
+
+        payload = self._read_json_body()
+        if payload is None:
+            return
+
+        if parsed.path == "/api/mockups/render":
+            self._handle_mockups_render(payload)
             return
 
         status = payload.get("status")

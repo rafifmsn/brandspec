@@ -21,8 +21,8 @@
 
         <div class="topbar-right">
           <div id="mode-tabs" class="segmented" hidden>
-            <button type="button" class="seg-btn is-active" data-tab="review">Review</button>
-            <button type="button" class="seg-btn" data-tab="mockups">Mockups</button>
+            <button type="button" class="seg-btn is-active" data-tab="review">Design</button>
+            <button type="button" class="seg-btn" data-tab="mockups">Mockup</button>
           </div>
         </div>
       </header>
@@ -175,9 +175,22 @@
       <section id="mockups-panel" class="mockups-workspace" hidden>
         <div class="mockups-inner">
           <div class="mockups-header">
-            <h2>Contextual Mockups</h2>
-            <p>Live HTML/CSS previews rendered from tokens and exported kit assets</p>
+            <div>
+              <h2>Brand Mockups</h2>
+              <p>Deterministic perspective scenes composited from the active candidate</p>
+            </div>
+            <div class="mockups-controls">
+              <input id="mockup-brand-name" type="text" placeholder="Brand name" aria-label="Brand name" />
+              <input id="mockup-headline" type="text" placeholder="Headline" aria-label="Headline" />
+              <input id="mockup-website" type="text" placeholder="Website" aria-label="Website" />
+              <label class="hex-box" for="mockup-accent" title="Brand accent hex">
+                <span id="mockup-accent-swatch" class="hex-swatch"></span>
+                <input id="mockup-accent" type="text" value="#525252" placeholder="#525252" maxlength="7" spellcheck="false" aria-label="Brand accent hex" />
+              </label>
+              <button type="button" id="mockup-render-btn" class="btn-secondary">Render Mockups</button>
+            </div>
           </div>
+          <div id="mockups-status" class="mockups-status" hidden></div>
           <div id="mockups-grid" class="mockups-grid"></div>
         </div>
       </section>

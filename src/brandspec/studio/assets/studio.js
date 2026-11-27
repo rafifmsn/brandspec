@@ -17,6 +17,9 @@
     leftCollapsed: false,
     fullscreen: false,
     pollHandle: null,
+    assetBust: 0,
+    mockupDefaultsForId: null,
+    mockupRendering: false,
   };
 
   const el = {
@@ -55,6 +58,13 @@
     historyPendingDot: document.getElementById("history-pending-dot"),
     zoomIn: document.getElementById("zoom-in"),
     zoomOut: document.getElementById("zoom-out"),
+    mockupBrandName: document.getElementById("mockup-brand-name"),
+    mockupHeadline: document.getElementById("mockup-headline"),
+    mockupWebsite: document.getElementById("mockup-website"),
+    mockupAccent: document.getElementById("mockup-accent"),
+    mockupAccentSwatch: document.getElementById("mockup-accent-swatch"),
+    mockupRenderBtn: document.getElementById("mockup-render-btn"),
+    mockupsStatus: document.getElementById("mockups-status"),
   };
 
   function isAwaitingAgent() {
@@ -206,10 +216,8 @@
     metaRow.className = "candidate-card-meta tabular";
     const idSpan = document.createElement("span");
     idSpan.textContent = cand.label || cand.id;
-    const statusSpan = document.createElement("span");
-    statusSpan.textContent = cand.metrics && cand.metrics.passed ? "PASS" : "WARN";
+    idSpan.title = cand.label || cand.id;
     metaRow.appendChild(idSpan);
-    metaRow.appendChild(statusSpan);
 
     btn.appendChild(thumbBox);
     btn.appendChild(metaRow);
@@ -367,12 +375,13 @@
       el.hexSwatch.style.background = state.view === "inverted" ? "#0b0c0e" : "#ffffff";
     }
 
+    const bust = state.assetBust ? `?v=${state.assetBust}` : "";
     if (state.view === "sheet" && cand.files.sheet_png) {
-      el.markImage.src = cand.files.sheet_png;
+      el.markImage.src = cand.files.sheet_png + bust;
     } else if (state.view === "grid" && cand.files.overlay_svg) {
-      el.markImage.src = cand.files.overlay_svg;
+      el.markImage.src = cand.files.overlay_svg + bust;
     } else {
-      el.markImage.src = cand.files.logo_svg;
+      el.markImage.src = cand.files.logo_svg + bust;
     }
 
     renderMetrics(cand.metrics);
@@ -523,8 +532,74 @@
     el.submitBtn.textContent = locked ? "Waiting for agent update" : "Submit Review";
   }
 
+  function syncMockupDefaults(cand) {
+    if (!cand || state.mockupDefaultsForId === cand.id) return;
+    state.mockupDefaultsForId = cand.id;
+    const spec = cand.spec || {};
+    const tokens = (state.session && state.session.tokens) || {};
+    el.mockupBrandName.value = spec.name || tokens.name || "Brandspec";
+    const rawConcept = String(spec.concept || "").trim();
+    el.mockupHeadline.value =
+      rawConcept && rawConcept.length <= 36 ? rawConcept : "Precision built for scale.";
+    if (!el.mockupWebsite.value) {
+      el.mockupWebsite.value = "brandspec.com";
+    }
+    let accent = tokens.accent || "#525252";
+    const fill = spec.post && spec.post.fill;
+    if (typeof fill === "string" && !["#000000", "#111111", "#ffffff"].includes(fill.toLowerCase())) {
+      accent = fill;
+    } else if (fill && Array.isArray(fill.stops)) {
+      const found = fill.stops.find((s) => s.color && !["#000000", "#111111", "#ffffff"].includes(s.color.toLowerCase()));
+      if (found) accent = found.color;
+    }
+    if (/^#[0-9a-fA-F]{6}$/.test(accent)) {
+      el.mockupAccent.value = accent.toLowerCase();
+      el.mockupAccentSwatch.style.background = accent.toLowerCase();
+    }
+  }
+
+  async function triggerMockupRender(cand) {
+    if (!cand || state.mockupRendering) return;
+    state.mockupRendering = true;
+    el.mockupRenderBtn.disabled = true;
+    el.mockupsStatus.hidden = false;
+    el.mockupsStatus.textContent = "Rendering perspective mockups...";
+    try {
+      const resp = await fetch("/api/mockups/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidate_id: cand.id,
+          brand_name: el.mockupBrandName.value.trim(),
+          headline: el.mockupHeadline.value.trim(),
+          website: el.mockupWebsite.value.trim(),
+          accent: el.mockupAccent.value,
+        }),
+      });
+      const body = await resp.json();
+      if (!resp.ok) {
+        el.mockupsStatus.textContent = body.error || "Failed to render mockups.";
+        return;
+      }
+      cand.mockups = body.mockups || [];
+      state.assetBust = Date.now();
+      el.mockupsStatus.hidden = true;
+      renderMockups();
+    } catch (err) {
+      el.mockupsStatus.textContent = `Error: ${err.message}`;
+    } finally {
+      state.mockupRendering = false;
+      el.mockupRenderBtn.disabled = false;
+    }
+  }
+
   function renderMockups() {
-    const hasMockups = Boolean(state.session && (state.session.tokens || state.session.kit));
+    const cand = activeCandidate();
+    const hasScenes = Boolean(
+      state.session &&
+        (state.session.has_mockup_templates || state.session.tokens || state.session.kit)
+    );
+    const hasMockups = Boolean(cand && hasScenes);
     el.modeTabs.hidden = !hasMockups;
     if (!hasMockups) {
       state.tab = "review";
@@ -534,50 +609,85 @@
     el.reviewWorkspace.hidden = showMockups;
     if (!showMockups) return;
 
+    syncMockupDefaults(cand);
     el.mockupsGrid.innerHTML = "";
+
+    const scenes = Array.isArray(cand.mockups) ? cand.mockups : [];
+    if (scenes.length === 0 && state.session.has_mockup_templates && !state.mockupRendering) {
+      triggerMockupRender(cand);
+      return;
+    }
+
+    const bust = state.assetBust ? `?v=${state.assetBust}` : "";
+    scenes.forEach((scene) => {
+      const tile = document.createElement("div");
+      tile.className = "mockup-tile";
+
+      const img = document.createElement("img");
+      img.className = "mockup-scene-img";
+      img.src = scene.url + bust;
+      img.alt = scene.title;
+      img.title = scene.title;
+      img.loading = "lazy";
+
+      const dl = document.createElement("a");
+      dl.className = "mockup-download-btn";
+      dl.href = scene.url + bust;
+      dl.download = `${cand.id}-${scene.id}.jpg`;
+      dl.innerHTML =
+        '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
+        '<path d="M8 2.5V10.5M8 10.5L4.8 7.3M8 10.5L11.2 7.3M3 13.5H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+        "</svg><span>Download</span>";
+
+      tile.appendChild(img);
+      tile.appendChild(dl);
+      el.mockupsGrid.appendChild(tile);
+    });
+
     const kit = state.session.kit || {};
     const tokens = state.session.tokens || {};
-    const cand = activeCandidate();
     const markSrc = kit["logo-light.svg"] || (cand && cand.files.logo_svg) || "";
 
-    const navCard = document.createElement("div");
-    navCard.className = "mockup-card";
-    const navTitle = document.createElement("div");
-    navTitle.className = "mockup-title";
-    navTitle.textContent = "Navbar and Favicon Tab";
-    const tabBar = document.createElement("div");
-    tabBar.className = "mockup-tab";
-    if (kit["favicon.ico"]) {
-      const fav = document.createElement("img");
-      fav.src = kit["favicon.ico"];
-      fav.width = 16;
-      fav.height = 16;
-      fav.alt = "Favicon";
-      tabBar.appendChild(fav);
-    }
-    const tabText = document.createElement("span");
-    tabText.textContent = tokens.name || "Brandspec";
-    tabBar.appendChild(tabText);
+    if (state.session.tokens || state.session.kit) {
+      const navCard = document.createElement("div");
+      navCard.className = "mockup-card";
+      const navTitle = document.createElement("div");
+      navTitle.className = "mockup-title";
+      navTitle.textContent = "Navbar and Favicon Tab";
+      const tabBar = document.createElement("div");
+      tabBar.className = "mockup-tab";
+      if (kit["favicon.ico"]) {
+        const fav = document.createElement("img");
+        fav.src = kit["favicon.ico"];
+        fav.width = 16;
+        fav.height = 16;
+        fav.alt = "Favicon";
+        tabBar.appendChild(fav);
+      }
+      const tabText = document.createElement("span");
+      tabText.textContent = tokens.name || "Brandspec";
+      tabBar.appendChild(tabText);
 
-    const navbar = document.createElement("div");
-    navbar.className = "mockup-navbar";
-    navbar.style.background = tokens.bg_surface || "#121316";
-    navbar.style.color = tokens.text_primary || "#f3f4f6";
-    if (markSrc) {
-      const logo = document.createElement("img");
-      logo.src = markSrc;
-      logo.width = 24;
-      logo.height = 24;
-      logo.alt = "Navbar mark";
-      navbar.appendChild(logo);
+      const navbar = document.createElement("div");
+      navbar.className = "mockup-navbar";
+      navbar.style.background = tokens.bg_surface || "#121316";
+      navbar.style.color = tokens.text_primary || "#f3f4f6";
+      if (markSrc) {
+        const logo = document.createElement("img");
+        logo.src = markSrc;
+        logo.width = 24;
+        logo.height = 24;
+        logo.alt = "Navbar mark";
+        navbar.appendChild(logo);
+      }
+      const navLinks = document.createElement("span");
+      navLinks.textContent = "Docs   Releases   Studio";
+      navbar.appendChild(navLinks);
+      navCard.appendChild(navTitle);
+      navCard.appendChild(tabBar);
+      navCard.appendChild(navbar);
+      el.mockupsGrid.appendChild(navCard);
     }
-    const navLinks = document.createElement("span");
-    navLinks.textContent = "Docs   Releases   Studio";
-    navbar.appendChild(navLinks);
-    navCard.appendChild(navTitle);
-    navCard.appendChild(tabBar);
-    navCard.appendChild(navbar);
-    el.mockupsGrid.appendChild(navCard);
 
     if (kit["icon-192.png"] || kit["icon-maskable-512.png"]) {
       const iconCard = document.createElement("div");
@@ -786,6 +896,18 @@
     renumberPins();
     state.focusedPinIndex = state.pins.length - 1;
     renderAll(true);
+  });
+
+  el.mockupAccent.addEventListener("input", () => {
+    const val = el.mockupAccent.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      el.mockupAccentSwatch.style.background = val.toLowerCase();
+    }
+  });
+
+  el.mockupRenderBtn.addEventListener("click", () => {
+    const cand = activeCandidate();
+    if (cand) triggerMockupRender(cand);
   });
 
   el.submitBtn.addEventListener("click", async () => {

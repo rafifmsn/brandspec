@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "pole-banner",
+  "title": "Street Pole Banner",
+  "category": "outdoor",
+  "background": "background.jpg",
+  "slots": [
+    {
+      "id": "main",
+      "quad": [[412, 116], [824, 76], [844, 772], [384, 788]],
+      "design_size": [600, 960],
+      "template_style": "banner_vertical",
+      "blend_mode": "luminance_transfer",
+      "opacity": 0.95
+    }
+  ]
+}

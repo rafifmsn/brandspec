@@ -27,9 +27,10 @@ body {
   height: 100%;
   background: var(--bg-canvas);
   color: var(--text-primary);
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Noto Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.45;
+  letter-spacing: -0.008em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -42,6 +43,16 @@ body {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+}
+
+.studio-shell input:-webkit-autofill,
+.studio-shell input:-webkit-autofill:hover,
+.studio-shell input:-webkit-autofill:focus,
+.studio-shell textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-surface) inset;
+  -webkit-text-fill-color: var(--text-primary);
+  caret-color: var(--text-primary);
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 /* Top bar */
@@ -358,9 +369,15 @@ body {
 .candidate-card-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   font-size: 11px;
   padding: 0 2px;
+}
+
+.candidate-card-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-history-group {
@@ -686,6 +703,7 @@ body {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+  letter-spacing: -0.015em;
   color: var(--text-primary);
 }
 
@@ -970,10 +988,19 @@ textarea:focus {
   gap: 18px;
 }
 
+.mockups-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
 .mockups-header h2 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
 .mockups-header p {
@@ -981,10 +1008,102 @@ textarea:focus {
   color: var(--text-secondary);
 }
 
+.mockups-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mockups-controls input[type="text"] {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  min-width: 140px;
+}
+
+.mockups-controls .hex-box {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-surface);
+}
+
+.mockups-controls .hex-box input[type="text"] {
+  height: auto;
+  min-width: 0;
+  width: 66px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.mockups-controls .btn-secondary {
+  height: 30px;
+  padding: 0 12px;
+}
+
+.mockups-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .mockups-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 14px;
+}
+
+.mockup-tile {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-surface);
+}
+
+.mockup-scene-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.mockup-download-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(11, 12, 14, 0.84);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #f3f4f6;
+  font-size: 11px;
+  font-weight: 500;
+  text-decoration: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 140ms ease, transform 140ms ease, border-color 140ms ease;
+}
+
+.mockup-tile:hover .mockup-download-btn,
+.mockup-tile:focus-within .mockup-download-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.mockup-download-btn:hover {
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .mockup-card {
@@ -1034,4 +1153,26 @@ textarea:focus {
   border-radius: 6px;
   border: 1px solid var(--border-hairline);
   display: block;
+}
+
+.btn-secondary {
+  appearance: none;
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: var(--border-active);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
