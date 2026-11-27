@@ -172,7 +172,12 @@ def run_studio_server(
         return 1
 
     try:
-        server, state = create_studio_server(target_dir, host="127.0.0.1", port=port)
+        server, state = create_studio_server(
+            target_dir,
+            host="127.0.0.1",
+            port=port,
+            wait_mode=wait,
+        )
     except OSError as exc:
         print(f"Studio error: could not bind 127.0.0.1:{port} ({exc})", file=sys.stderr)
         return 1
@@ -718,14 +723,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_skill.set_defaults(func=cmd_install_skill)
 
-    p_review = sub.add_parser("review", help="Start localhost visual review studio")
+    p_review = sub.add_parser(
+        "review",
+        help="Start localhost visual review studio",
+        description=(
+            "Start localhost BrandSpec Studio for visual review. "
+            "Submissions write review.json and snapshot rounds/round-N/ inside --dir; "
+            "advancing to Round 2 requires rebuilding into --dir (or clearing review.json)."
+        ),
+    )
     p_review.add_argument("--dir", required=True, help="Compiled build or sweep directory")
-    p_review.add_argument("--port", type=int, default=0, help="TCP port (0 for ephemeral)")
+    p_review.add_argument("--port", type=int, default=0, help="TCP port (default 0, ephemeral)")
     p_review.add_argument("--open", action="store_true", help="Open browser automatically")
     p_review.add_argument(
         "--wait",
         action="store_true",
-        help="Block until POST /api/review submits feedback and print JSON",
+        help="Block until a single POST /api/review submission, print JSON, and exit",
     )
     p_review.add_argument(
         "--timeout",

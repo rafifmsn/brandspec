@@ -75,6 +75,7 @@ def test_session_discovers_single_and_multi_candidate_dirs(tmp_path: Path) -> No
         assert "<title>Brandspec</title>" in html_text
         assert "Brandspec</span>" in html_text
         assert 'id="history-pending-dot"' in html_text
+        assert 'id="wait-closed-layer"' in html_text
 
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/assets/studio.css", timeout=5) as resp:
             css_text = resp.read().decode("utf-8")
@@ -82,13 +83,16 @@ def test_session_discovers_single_and_multi_candidate_dirs(tmp_path: Path) -> No
         assert "tabular-nums" in css_text
         assert "flex-wrap: nowrap" in css_text
         assert "display: none !important" in css_text
+        assert ".wait-closed-layer" in css_text
 
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/assets/studio.js", timeout=5) as resp:
             js_text = resp.read().decode("utf-8")
         assert "renumberPins" in js_text
         assert "nextPinId" not in js_text
         assert "isAwaitingAgent" in js_text
+        assert "showWaitClosedLayer" in js_text
         assert session["awaiting_agent"] is False
+        assert session["wait_mode"] is False
     finally:
         server.shutdown()
         server.server_close()
@@ -143,6 +147,7 @@ def test_post_review_writes_json_and_unblocks_wait(tmp_path: Path) -> None:
             )
             assert status == 200
             assert body["round"] == 1
+            assert body["wait_mode"] is True
 
         threading.Thread(target=_post, daemon=True).start()
 
@@ -159,12 +164,14 @@ def test_post_review_writes_json_and_unblocks_wait(tmp_path: Path) -> None:
     assert review_v1["round"] == 1
     assert review_v1["status"] == "revise"
     assert review_v1["pins"][0]["x_grid"] == -1.5
+    assert "wait_mode" not in review_v1
 
     def submit_round_two(url: str, _state) -> None:
         def _post() -> None:
             status, sess = _http_json(f"{url}api/session")
             assert status == 200
             assert sess["round"] == 2
+            assert sess["wait_mode"] is True
             assert sess["latest_review"]["round"] == 1
             assert len(sess["round_groups"]) == 1
             assert sess["round_groups"][0]["round"] == 1
