@@ -15,21 +15,15 @@ import threading
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from pydantic import TypeAdapter, ValidationError
-
 from ..core.grid import GridSpec, grid_overlay_svg
-from ..core.paths import FillSpec, render_svg_doc
+from ..core.paths import render_svg_doc
 from ..core.rounds import (
     ALLOWED_CANDIDATE_FILES,
     ROUND_DIR_RE,
     candidate_dir_map,
     snapshot_round_candidates,
 )
-from ..engines.mark.artifacts import write_mark_artifacts
-from ..engines.mark.compiler import compile_spec
-from ..engines.mark.schema import MarkSpec
 from ..engines.mockup import MockupContext, discover_templates, render_all_mockups
-from ..inspect import analyze_compiled
 
 ALLOWED_KIT_FILES = {
     "tokens.spec.json",
@@ -543,47 +537,6 @@ class StudioHandler(BaseHTTPRequestHandler):
             return None
         return payload
 
-    def _handle_candidate_fill(self, payload: dict[str, Any]) -> None:
-        cid = str(payload.get("candidate_id") or "default")
-        cdirs = candidate_dir_map(self.state.root_dir)
-        if cid not in cdirs:
-            self._send_json(HTTPStatus.NOT_FOUND, {"error": "Unknown candidate"})
-            return
-        cdir = cdirs[cid]
-        spec_path = cdir / "spec.json"
-        if not spec_path.is_file():
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Candidate has no spec.json"})
-            return
-        if "fill" not in payload:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "Missing fill payload"})
-            return
-
-        try:
-            validated_fill = TypeAdapter(FillSpec).validate_python(payload["fill"])
-            spec_data = json.loads(spec_path.read_text(encoding="utf-8"))
-            post_data = spec_data.setdefault("post", {})
-            if isinstance(validated_fill, str):
-                post_data["fill"] = validated_fill
-            else:
-                post_data["fill"] = validated_fill.model_dump(mode="json")
-            mark_spec = MarkSpec.model_validate(spec_data)
-        except (OSError, json.JSONDecodeError, ValidationError, TypeError) as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"Invalid fill or spec: {exc}"})
-            return
-
-        compiled = compile_spec(mark_spec)
-        metrics = analyze_compiled(compiled)
-        write_mark_artifacts(mark_spec, compiled, metrics, cdir)
-        self._send_json(
-            HTTPStatus.OK,
-            {
-                "candidate_id": cid,
-                "fill": mark_spec.post.fill if isinstance(mark_spec.post.fill, str) else mark_spec.post.fill.model_dump(mode="json"),
-                "spec": mark_spec.model_dump(mode="json", exclude_none=True),
-                "metrics": metrics.to_dict(),
-            },
-        )
-
     def _handle_mockups_render(self, payload: dict[str, Any]) -> None:
         cid = str(payload.get("candidate_id") or "default")
         cdirs = candidate_dir_map(self.state.root_dir)
@@ -611,7 +564,7 @@ class StudioHandler(BaseHTTPRequestHandler):
                     if c and c not in {"#000000", "#111111", "#ffffff"}:
                         accent = c
                         break
-            accent = accent or str(tokens_data.get("accent") or "#2563eb")
+            accent = accent or str(tokens_data.get("accent") or "#525252")
 
         raw_concept = str(spec_data.get("concept") or "").strip()
         default_headline = raw_concept if raw_concept and len(raw_concept) <= 36 else "Precision built for scale."
@@ -619,7 +572,7 @@ class StudioHandler(BaseHTTPRequestHandler):
             brand_name=str(payload.get("brand_name") or spec_data.get("name") or "Brandspec").strip(),
             headline=str(payload.get("headline") or default_headline).strip(),
             tagline=str(payload.get("tagline") or "Deterministic identity across every surface.").strip(),
-            website=str(payload.get("website") or "brandspec.dev").strip(),
+            website=str(payload.get("website") or "brandspec.com").strip(),
             accent=accent.lower(),
             surface_dark=str(tokens_data.get("bg_canvas") or "#111318"),
             text_light=str(tokens_data.get("text_primary") or "#f9fafb"),
@@ -638,16 +591,12 @@ class StudioHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path not in {"/api/review", "/api/candidate/fill", "/api/mockups/render"}:
+        if parsed.path not in {"/api/review", "/api/mockups/render"}:
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "Route not found"})
             return
 
         payload = self._read_json_body()
         if payload is None:
-            return
-
-        if parsed.path == "/api/candidate/fill":
-            self._handle_candidate_fill(payload)
             return
 
         if parsed.path == "/api/mockups/render":

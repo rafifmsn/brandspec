@@ -45,6 +45,16 @@ body {
   overflow: hidden;
 }
 
+.studio-shell input:-webkit-autofill,
+.studio-shell input:-webkit-autofill:hover,
+.studio-shell input:-webkit-autofill:focus,
+.studio-shell textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-surface) inset;
+  -webkit-text-fill-color: var(--text-primary);
+  caret-color: var(--text-primary);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 /* Top bar */
 .topbar {
   height: 48px;
@@ -359,9 +369,15 @@ body {
 .candidate-card-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   font-size: 11px;
   padding: 0 2px;
+}
+
+.candidate-card-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-history-group {

@@ -583,7 +583,7 @@ def cmd_mockup_build(args: argparse.Namespace) -> int:
         args.accent
         or tokens_data.get("accent")
         or _extract_accent_from_spec(spec_data)
-        or "#2563eb"
+        or "#525252"
     )
     raw_concept = str(spec_data.get("concept") or "").strip()
     default_headline = raw_concept if raw_concept and len(raw_concept) <= 36 else "Precision built for scale."
@@ -591,7 +591,7 @@ def cmd_mockup_build(args: argparse.Namespace) -> int:
         brand_name=args.brand_name or spec_data.get("name") or tokens_data.get("name") or "Brandspec",
         headline=args.headline or default_headline,
         tagline=args.tagline or "Deterministic identity across every surface.",
-        website=args.website or "brandspec.dev",
+        website=args.website or "brandspec.com",
         accent=accent,
         surface_dark=tokens_data.get("bg_canvas", "#111318"),
         text_light=tokens_data.get("text_primary", "#f9fafb"),

@@ -21,6 +21,10 @@ brandspec init <archetype> --out <path/to/spec.json>
 brandspec build <path/to/spec.json> --out-dir <path/to/out>
 brandspec check <path/to/spec.json>
 brandspec sweep <path/to/spec.json> --set layers.1.halo=0.35,0.4,0.45 --out-dir <path/to/out>
+brandspec wordmark build <wordmark.spec.json> --out-dir <path/to/out>
+brandspec lockup build <lockup.spec.json> --out-dir <path/to/out>
+brandspec mockup list
+brandspec mockup build <out_dir_or_svg> --brand-name "Brand" --headline "Short headline" --accent "#525252"
 brandspec review --dir <path/to/out> --wait
 ```
 
@@ -58,9 +62,16 @@ When adding an overpass that re-crosses an earlier band without cutting itself, 
   - `halftone_grid`: `center`, `cols`, `rows`, `pitch`, `shape` (`circle`, `square`, `diamond`), `min_size`, `max_size`, `field` (`radial_decay`, `radial_grow`, `linear_x`, `linear_y`, `diagonal`, `sine_ripple`).
 - **Layers (`layers[]`)**: `id`, `op` (`"unite"`, `"subtract"`, `"intersect"`, `"xor"`), `halo`, `halo_join` (`"round"`, `"miter"`, `"bevel"`), `halo_cap` (`"round"`, `"butt"`, `"square"`), `halo_targets`, `shapes`, `clip_to`, `symmetry`.
 - **Symmetry (`symmetry.type`)**: `"none"`, `"mirror_x"`, `"mirror_y"`, `"mirror_xy"`, `"rotate"` (`count`, `step_deg`, `scale_step`), `"glide_x"`.
+- **Post-process (`post`)**: `canvas_size`, `padding`, `optical_center`, `invert`, `precision`, `fill` (default `"#000000"`, or `{"type": "linear"|"radial", "angle_deg": 0, "stops": [{"offset": 0, "color": "#..."}, ...]}`).
+
+## Logotypes, Lockups, and Mockups
+
+- **Standalone wordmarks (`WordmarkSpec`)**: Use any `.ttf` or `.otf` font path (`font_path`) when a logotype-only identity or paired wordmark is appropriate. Supports `case` (`as_is`, `upper`, `lower`), `tracking_em`, `kerning_pairs`, `ink_trap`, and `stencil_cuts`.
+- **Optical lockups (`LockupSpec`)**: Pair `mark_spec` + `wordmark_spec` (`horizontal`, `stacked`, `badge`). Prefer `align: "optical_center"` or `"cap_height"` / `"x_height"` and fine-tune perceptual balance with `offset_x_u` / `offset_y_u` after inspecting `sheet.png`.
+- **Perspective mockups (`brandspec mockup build`)**: Composite any compiled `logo.svg` or `lockup.svg` onto bundled photographic scenes (`highway-billboard`, `fence-billboard`, `concourse-lightbox`, `pole-banner`, `stacked-cards`, `concrete-card`, `mailer-box`, `matte-phone`, `street-hoarding`). Keep `--headline` concise (`<= 32` chars) for clean billboard layout.
 
 ## Agent Workflow (3 Steps)
 
-1. **Map concept to archetype**: Choose 2 to 3 distinct structural directions (e.g., an interlocking ribbon, a radial vortex, or a modulated line screen) that fit the brand metaphor. Run `brandspec init` or author `spec.json` drafts.
-2. **Build and inspect**: Run `brandspec build <spec.json> --out-dir <dir>` and read both `metrics.json` and `sheet.png` (using your file/image reader).
-3. **Refine once**: Check the construction grid panel for misaligned tangents, check `metrics.json` for `warnings` (ink ratio target `0.22` to `0.55`, zero tiny islands), and check Panel 4 to ensure the silhouette reads cleanly at 24px. Adjust parameters in `spec.json`, rebuild, and deliver the final `logo.svg` + `spec.json`.
+1. **Map concept to archetype**: Choose 2 to 3 distinct structural directions (e.g., an interlocking ribbon, a radial vortex, a modulated line screen, or a wordmark/lockup) that fit the brand metaphor. Run `brandspec init` or author `spec.json` drafts.
+2. **Build and inspect**: Run `brandspec build` / `wordmark build` / `lockup build` and read both `metrics.json` and `sheet.png` (using your file/image reader).
+3. **Refine once**: Check the construction grid or clearspace panel, check `metrics.json` for `warnings` (ink ratio target `0.22` to `0.55`, zero tiny islands), and check Panel 4 to ensure the silhouette reads cleanly at 24px. Adjust parameters in `spec.json`, rebuild, and deliver the final `logo.svg` + `spec.json` (and optional mockups).

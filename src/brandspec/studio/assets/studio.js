@@ -216,10 +216,8 @@
     metaRow.className = "candidate-card-meta tabular";
     const idSpan = document.createElement("span");
     idSpan.textContent = cand.label || cand.id;
-    const statusSpan = document.createElement("span");
-    statusSpan.textContent = cand.metrics && cand.metrics.passed ? "PASS" : "WARN";
+    idSpan.title = cand.label || cand.id;
     metaRow.appendChild(idSpan);
-    metaRow.appendChild(statusSpan);
 
     btn.appendChild(thumbBox);
     btn.appendChild(metaRow);
@@ -544,9 +542,9 @@
     el.mockupHeadline.value =
       rawConcept && rawConcept.length <= 36 ? rawConcept : "Precision built for scale.";
     if (!el.mockupWebsite.value) {
-      el.mockupWebsite.value = "brandspec.dev";
+      el.mockupWebsite.value = "brandspec.com";
     }
-    let accent = tokens.accent || "#2563eb";
+    let accent = tokens.accent || "#525252";
     const fill = spec.post && spec.post.fill;
     if (typeof fill === "string" && !["#000000", "#111111", "#ffffff"].includes(fill.toLowerCase())) {
       accent = fill;

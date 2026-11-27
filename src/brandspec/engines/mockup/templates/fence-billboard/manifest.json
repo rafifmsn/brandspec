@@ -7,7 +7,7 @@
   "slots": [
     {
       "id": "main",
-      "quad": [[248, 204], [948, 284], [960, 624], [248, 712]],
+      "quad": [[244, 200], [956, 280], [962, 628], [244, 714]],
       "design_size": [1400, 740],
       "template_style": "billboard_split",
       "blend_mode": "luminance_transfer",

@@ -35,8 +35,8 @@
 
 - **Agent Interface (`skills/brandspec/`, `cli.py`)**: Supplies agents with design construction rules, starter archetypes, deterministic build and sweep commands, skill installation, and machine-readable pass/warn feedback.
 - **Core Geometry (`core/`)**: Resolves centered `square`, `isometric` (30-degree axial), and `polar` grids, builds continuous `grid_path` polylines with exact cubic Bezier corner fillets, applies symmetry, and computes outward `halo` offsets (`round`, `miter`, `bevel` joins) via `skia-pathops`.
-- **Engines (`engines/`)**: Includes `mark` (constructive primitives and optical effects with `clip_to` masks, `halo`, and `halo_targets`), `wordmark` (outlined font glyphs with kerning, ink traps, and stencil cuts), `lockup` (horizontal, stacked, and badge compositions), `icons` (matched `24x24` icon sets), `pattern` (3x3 seamless tiling SVG patterns), `tokens` (WCAG/APCA contrast audits and palette quantization), and `kit` (favicons, PWA icons, OG cards, and CSS tokens).
-- **Visual Inspection & Studio (`inspect/`, `studio/`)**: Rasterizes via `resvg-py` to render a 4-panel `sheet.png`, computes `metrics.json` checks via `numpy` and `pillow`, and serves an interactive localhost review console (`brandspec review` / `brandspec serve`).
+- **Engines (`engines/`)**: Includes `mark` (constructive primitives and optical effects with `clip_to` masks, `halo`, and `halo_targets`), `wordmark` (outlined font glyphs with kerning, ink traps, and stencil cuts), `lockup` (horizontal, stacked, and badge compositions with optical alignment), `mockup` (deterministic perspective compositing onto photographic scenes), `icons` (matched `24x24` icon sets), `pattern` (3x3 seamless tiling SVG patterns), `tokens` (WCAG/APCA contrast audits and palette quantization), and `kit` (favicons, PWA icons, OG cards, and CSS tokens).
+- **Visual Inspection & Studio (`inspect/`, `studio/`)**: Rasterizes via `resvg-py` to render a 4-panel `sheet.png`, computes `metrics.json` checks via `numpy` and `pillow`, and serves an interactive localhost review and mockup console (`brandspec review` / `brandspec serve`).
 
 ## Project Layout
 
@@ -48,6 +48,7 @@ brandspec/
 ├── docs/
 │   ├── PRD.md                        # Master product requirements
 │   ├── decisions.md                  # Architecture decisions
+│   ├── mockup-prompts.md             # Blank-surface mockup background prompts
 │   └── specs/                        # Module specifications (01-07)
 ├── LICENSE                           # GNU General Public License v3.0
 ├── pyproject.toml
@@ -64,6 +65,7 @@ brandspec/
 │   │   ├── kit/                      # Favicon, PWA, OG card, and CSS token exporter
 │   │   ├── lockup/                   # Mark and wordmark lockup composer
 │   │   ├── mark/                     # Geometric and optical mark compiler, sweep, archetypes
+│   │   ├── mockup/                   # Perspective mockup composer, renderer, and templates
 │   │   ├── pattern/                  # Seamless 3x3 tiling SVG pattern compiler
 │   │   ├── tokens/                   # WCAG/APCA contrast audit and palette extraction
 │   │   └── wordmark/                 # Outlined font glyph wordmark compiler
@@ -73,6 +75,7 @@ brandspec/
     ├── test_cli_skill.py
     ├── test_compiler.py
     ├── test_icons_pattern.py
+    ├── test_mockup.py
     ├── test_studio.py
     ├── test_sweep.py
     ├── test_tokens_kit.py
@@ -126,8 +129,10 @@ npx skills add rafifmsn/brandspec
 | `brandspec tokens check <tokens.spec.json>` | Audits WCAG 2.1 and APCA contrast across declared token and surface pairs. |
 | `brandspec palette extract <image> [--colors 6] [--out <path>]` | Quantizes a reference image into deterministic hex `tokens.spec.json`. |
 | `brandspec kit build <kit.spec.json> [--out-dir <dir>]` | Exports SVG variants, `favicon.ico`, PWA icons, `og-card.png`, and `tokens.css`. |
-| `brandspec wordmark build <wordmark.spec.json> [--out-dir <dir>]` | Outlines `.ttf`/`.otf` glyphs via `fontTools` with kerning, ink traps, and stencil cuts. |
-| `brandspec lockup build <lockup.spec.json> [--out-dir <dir>]` | Pairs mark and wordmark into horizontal, stacked, or badge lockups with `1u`/`2u` clearspace guides. |
+| `brandspec wordmark build <wordmark.spec.json> [--out-dir <dir>]` | Outlines `.ttf`/`.otf` glyphs via `fontTools` with kerning, ink traps, stencil cuts, and `sheet.png`. |
+| `brandspec lockup build <lockup.spec.json> [--out-dir <dir>]` | Pairs mark and wordmark into horizontal, stacked, or badge lockups with optical alignment, clearspace guides, and `sheet.png`. |
+| `brandspec mockup list` | Lists all bundled photographic mockup scene templates. |
+| `brandspec mockup build <target> [--brand-name <name>] [--headline <text>]` | Composites a mark, wordmark, or lockup onto perspective mockup scenes. |
 | `brandspec icons build <icons.spec.json> [--out-dir <dir>]` | Compiles matched `24x24` icon sets inheriting mark geometry defaults. |
 | `brandspec pattern build <pattern.spec.json> [--out-dir <dir>]` | Compiles 3x3 periodic-wrapped seamless tiling SVG patterns. |
 | `brandspec install-skill [--target <preset-or-path>] [--force]` | Installs the bundled `SKILL.md` for AI agents (`agents`, `project`, `claude`, `cursor`, `codex`, `antigravity`, or a custom path). |

@@ -7,6 +7,7 @@ import io
 import re
 from xml.sax.saxutils import escape
 
+import numpy as np
 from PIL import Image, ImageDraw
 import resvg_py
 
@@ -28,8 +29,8 @@ class MockupContext:
     brand_name: str = "Brandspec"
     headline: str = "Precision built for scale."
     tagline: str = "Deterministic identity across every surface."
-    website: str = "brandspec.dev"
-    accent: str = "#2563eb"
+    website: str = "brandspec.com"
+    accent: str = "#525252"
     surface_dark: str = "#111318"
     surface_light: str = "#f5f4ef"
     text_light: str = "#f9fafb"
@@ -134,17 +135,48 @@ def _extract_svg_fragment(svg_text: str, mono_fill: str | None = None) -> tuple[
     return vb, inner.strip()
 
 
+def _tight_viewbox(svg_text: str, vb: str) -> str:
+    """Compute a tight ink viewBox so wide lockups and wordmarks fill mockup slots cleanly."""
+    parts = vb.replace(",", " ").split()
+    if len(parts) != 4:
+        return vb
+    try:
+        vx, vy, vw, vh = (float(p) for p in parts)
+    except ValueError:
+        return vb
+    if vw <= 0 or vh <= 0:
+        return vb
+    sample = 200
+    try:
+        png_bytes = resvg_py.svg_to_bytes(svg_string=svg_text, width=sample, height=sample)
+        alpha = np.asarray(Image.open(io.BytesIO(png_bytes)).convert("RGBA"))[:, :, 3]
+    except Exception:
+        return vb
+    ys, xs = np.nonzero(alpha > 10)
+    if len(xs) == 0:
+        return vb
+    x0 = vx + (int(xs.min()) / sample) * vw
+    y0 = vy + (int(ys.min()) / sample) * vh
+    w_ink = max(vw * 0.05, ((int(xs.max()) - int(xs.min()) + 1) / sample) * vw)
+    h_ink = max(vh * 0.05, ((int(ys.max()) - int(ys.min()) + 1) / sample) * vh)
+    return f"{x0:.1f} {y0:.1f} {w_ink:.1f} {h_ink:.1f}"
+
+
 def _nested_mark(
     svg_text: str,
     x: float,
     y: float,
-    size: float,
+    width: float,
+    height: float | None = None,
     mono_fill: str | None = None,
+    preserve_aspect: str = "xMidYMid meet",
 ) -> str:
+    h = width if height is None else height
     vb, inner = _extract_svg_fragment(svg_text, mono_fill=mono_fill)
+    tight_vb = _tight_viewbox(svg_text, vb)
     return (
-        f'<svg x="{x:.1f}" y="{y:.1f}" width="{size:.1f}" height="{size:.1f}" '
-        f'viewBox="{escape(vb)}" preserveAspectRatio="xMidYMid meet">{inner}</svg>'
+        f'<svg x="{x:.1f}" y="{y:.1f}" width="{width:.1f}" height="{h:.1f}" '
+        f'viewBox="{escape(tight_vb)}" preserveAspectRatio="{preserve_aspect}">{inner}</svg>'
     )
 
 
@@ -185,13 +217,14 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
         )
 
     if style == "card_minimal":
-        mark_s = h * 0.22
+        mark_w = w * 0.34
+        mark_h = h * 0.22
         pad_x = w * 0.08
         pad_y = h * 0.13
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
-            f"{_nested_mark(logo_svg, pad_x, pad_y, mark_s)}"
-            f'<text x="{w - pad_x:.1f}" y="{pad_y + mark_s * 0.55:.1f}" fill="{ctx.accent}" '
+            f"{_nested_mark(logo_svg, pad_x, pad_y, mark_w, mark_h, preserve_aspect='xMinYMid meet')}"
+            f'<text x="{w - pad_x:.1f}" y="{pad_y + mark_h * 0.55:.1f}" fill="{ctx.accent}" '
             f'font-family="{FONT_STACK}" font-size="{h * 0.055:.1f}" font-weight="600" '
             f'text-anchor="end">{escape(ctx.website)}</text>'
             f'<text x="{pad_x:.1f}" y="{h - pad_y - h * 0.095:.1f}" fill="{ctx.text_dark}" '
@@ -207,15 +240,16 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
         bg = ctx.accent
         fg = _contrast_text(bg, ctx.text_light, ctx.text_dark)
         s_defs, s_fill = _surface_gradient_defs(bg, "card-grad")
-        mark_s = h * 0.28
+        mark_w = w * 0.56
+        mark_h = h * 0.28
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
             f"{s_defs}"
             f'<rect width="{w}" height="{h}" fill="{s_fill}"/>'
-            f"{_nested_mark(logo_svg, 0.5 * w - mark_s * 0.5, h * 0.22, mark_s, mono_fill=fg)}"
+            f"{_nested_mark(logo_svg, 0.5 * (w - mark_w), h * 0.20, mark_w, mark_h, mono_fill=fg)}"
             f'<text x="{0.5 * w:.1f}" y="{h * 0.67:.1f}" fill="{fg}" '
-            f'font-family="{FONT_STACK}" font-size="{h * 0.135:.1f}" font-weight="700" '
-            f'text-anchor="middle" letter-spacing="0.06em">{escape(ctx.brand_name.upper())}</text>'
+            f'font-family="{FONT_STACK}" font-size="{h * 0.13:.1f}" font-weight="700" '
+            f'text-anchor="middle" letter-spacing="0.02em">{escape(ctx.brand_name)}</text>'
             f'<text x="{0.5 * w:.1f}" y="{h * 0.85:.1f}" fill="{fg}" fill-opacity="0.78" '
             f'font-family="{FONT_STACK}" font-size="{h * 0.048:.1f}" font-weight="500" '
             f'text-anchor="middle">{escape(ctx.website)}</text>'
@@ -224,10 +258,11 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
 
     if style == "box_seal":
         ink = "#1c1917"
-        mark_s = min(w, h) * 0.30
+        mark_w = w * 0.48
+        mark_h = h * 0.30
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
-            f"{_nested_mark(logo_svg, 0.5 * w - mark_s * 0.5, h * 0.18, mark_s, mono_fill=ink)}"
+            f"{_nested_mark(logo_svg, 0.5 * (w - mark_w), h * 0.18, mark_w, mark_h, mono_fill=ink)}"
             f'<text x="{0.5 * w:.1f}" y="{h * 0.64:.1f}" fill="{ink}" '
             f'font-family="{FONT_STACK}" font-size="{h * 0.11:.1f}" font-weight="700" '
             f'text-anchor="middle" letter-spacing="-0.02em">{escape(ctx.brand_name)}</text>'
@@ -241,16 +276,17 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
         bg = ctx.accent
         fg = _contrast_text(bg, ctx.text_light, ctx.text_dark)
         s_defs, s_fill = _surface_gradient_defs(bg, "banner-grad")
-        mark_s = w * 0.56
+        mark_w = w * 0.72
+        mark_h = h * 0.34
         lines = _wrap_lines(ctx.headline, max_chars=14, max_lines=3)
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
             f"{s_defs}"
             f'<rect width="{w}" height="{h}" fill="{s_fill}"/>'
-            f'<text x="{w * 0.10:.1f}" y="{h * 0.09:.1f}" fill="{fg}" fill-opacity="0.82" '
+            f'<text x="{w * 0.10:.1f}" y="{h * 0.09:.1f}" fill="{fg}" fill-opacity="0.85" '
             f'font-family="{FONT_STACK}" font-size="{w * 0.055:.1f}" font-weight="700" '
-            f'letter-spacing="0.06em">{escape(ctx.brand_name.upper())}</text>'
-            f"{_nested_mark(logo_svg, 0.5 * (w - mark_s), h * 0.16, mark_s, mono_fill=fg)}"
+            f'letter-spacing="0.01em">{escape(ctx.brand_name)}</text>'
+            f"{_nested_mark(logo_svg, 0.5 * (w - mark_w), h * 0.17, mark_w, mark_h, mono_fill=fg)}"
             f"{_svg_lines(lines, w * 0.10, h * 0.64, w * 0.105, w * 0.12, fg)}"
             f'<text x="{w * 0.10:.1f}" y="{h * 0.93:.1f}" fill="{fg}" fill-opacity="0.82" '
             f'font-family="{FONT_STACK}" font-size="{w * 0.045:.1f}" font-weight="500">'
@@ -265,7 +301,8 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
         s_defs, s_fill = _surface_gradient_defs(bg, "bb-grad")
         mark_fill = _auto_mark_fill(logo_svg, bg) if bg == ctx.surface_light else fg
         pad_x = w * 0.06
-        mark_s = h * (0.56 if is_wide else 0.48)
+        mark_w = w * (0.24 if is_wide else 0.28)
+        mark_h = h * (0.56 if is_wide else 0.48)
         char_len = max(1, len(ctx.headline.strip()))
         max_chars = (28 if is_wide else 22) if char_len <= 34 else (34 if is_wide else 28)
         lines = _wrap_lines(ctx.headline, max_chars=max_chars, max_lines=3)
@@ -285,7 +322,7 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
             f'<text x="{pad_x:.1f}" y="{h * 0.86:.1f}" fill="{fg}" fill-opacity="0.76" '
             f'font-family="{FONT_STACK}" font-size="{h * 0.056:.1f}" font-weight="500">'
             f"{escape(ctx.brand_name)}  ·  {escape(ctx.website)}</text>"
-            f"{_nested_mark(logo_svg, w - pad_x - mark_s, 0.5 * (h - mark_s), mark_s, mono_fill=mark_fill)}"
+            f"{_nested_mark(logo_svg, w - pad_x - mark_w, 0.5 * (h - mark_h), mark_w, mark_h, mono_fill=mark_fill, preserve_aspect='xMaxYMid meet')}"
             f"</svg>"
         )
 
@@ -308,14 +345,15 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
     if style == "hoarding_panel_mid":
         bg = ctx.surface_dark
         fg = ctx.text_light
-        mark_s = min(w, h) * 0.54
+        mark_w = w * 0.72
+        mark_h = h * 0.48
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
             f'<rect width="{w}" height="{h}" fill="{bg}"/>'
             f'<text x="{0.5 * w:.1f}" y="{h * 0.13:.1f}" fill="{fg}" '
             f'font-family="{FONT_STACK}" font-size="{h * 0.065:.1f}" font-weight="700" '
             f'text-anchor="middle">{escape(ctx.brand_name)}</text>'
-            f"{_nested_mark(logo_svg, 0.5 * (w - mark_s), 0.5 * (h - mark_s), mark_s, mono_fill=_auto_mark_fill(logo_svg, bg))}"
+            f"{_nested_mark(logo_svg, 0.5 * (w - mark_w), 0.5 * (h - mark_h), mark_w, mark_h, mono_fill=_auto_mark_fill(logo_svg, bg))}"
             f'<text x="{0.5 * w:.1f}" y="{h * 0.90:.1f}" fill="{fg}" fill-opacity="0.72" '
             f'font-family="{FONT_STACK}" font-size="{h * 0.045:.1f}" font-weight="500" '
             f'text-anchor="middle">{escape(ctx.website)}</text>'
@@ -325,24 +363,26 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
     if style == "hoarding_panel_right":
         bg = ctx.accent
         fg = _contrast_text(bg, ctx.text_light, ctx.text_dark)
-        mark_s = h * 0.44
-        lines = _wrap_lines(ctx.tagline, max_chars=18, max_lines=3)
+        mark_w = w * 0.34
+        mark_h = h * 0.44
+        lines = _wrap_lines(ctx.tagline, max_chars=20, max_lines=3)
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
             f'<defs><linearGradient id="hoard-grad" x1="0%" y1="0%" x2="100%" y2="100%">'
             f'<stop offset="0%" stop-color="{bg}"/>'
             f'<stop offset="100%" stop-color="{ctx.surface_dark}"/></linearGradient></defs>'
             f'<rect width="{w}" height="{h}" fill="url(#hoard-grad)"/>'
-            f"{_nested_mark(logo_svg, w * 0.07, 0.5 * (h - mark_s), mark_s, mono_fill=ctx.text_light)}"
-            f"{_svg_lines(lines, w * 0.44, h * 0.39, h * 0.070, h * 0.088, ctx.text_light)}"
-            f'<text x="{w * 0.44:.1f}" y="{h * 0.84:.1f}" fill="{ctx.text_light}" fill-opacity="0.80" '
+            f"{_nested_mark(logo_svg, w * 0.08, 0.5 * (h - mark_h), mark_w, mark_h, mono_fill=ctx.text_light, preserve_aspect='xMinYMid meet')}"
+            f"{_svg_lines(lines, w * 0.50, h * 0.38, h * 0.074, h * 0.092, ctx.text_light)}"
+            f'<text x="{w * 0.50:.1f}" y="{h * 0.84:.1f}" fill="{ctx.text_light}" fill-opacity="0.80" '
             f'font-family="{FONT_STACK}" font-size="{h * 0.048:.1f}" font-weight="600">'
             f"{escape(ctx.website)}</text>"
             f"</svg>"
         )
 
     # phone_splash
-    mark_s = w * 0.40
+    mark_w = w * 0.58
+    mark_h = h * 0.20
     lines = _wrap_lines(ctx.tagline, max_chars=22, max_lines=2)
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">'
@@ -353,7 +393,7 @@ def _compose_slot_svg(slot: MockupSlot, logo_svg: str, ctx: MockupContext) -> st
         f'<rect width="{w}" height="{h}" fill="url(#phone-glow)"/>'
         f'<rect x="{w * 0.36:.1f}" y="{h * 0.03:.1f}" width="{w * 0.28:.1f}" height="{h * 0.018:.1f}" '
         f'rx="{h * 0.009:.1f}" fill="#000000"/>'
-        f"{_nested_mark(logo_svg, 0.5 * (w - mark_s), h * 0.28, mark_s, mono_fill=_auto_mark_fill(logo_svg, ctx.surface_dark))}"
+        f"{_nested_mark(logo_svg, 0.5 * (w - mark_w), h * 0.27, mark_w, mark_h, mono_fill=_auto_mark_fill(logo_svg, ctx.surface_dark))}"
         f'<text x="{0.5 * w:.1f}" y="{h * 0.55:.1f}" fill="{ctx.text_light}" '
         f'font-family="{FONT_STACK}" font-size="{w * 0.088:.1f}" font-weight="700" '
         f'text-anchor="middle">{escape(ctx.brand_name)}</text>'
