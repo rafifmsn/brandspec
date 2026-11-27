@@ -17,6 +17,20 @@
     leftCollapsed: false,
     fullscreen: false,
     pollHandle: null,
+    assetBust: 0,
+    mockupDefaultsForId: null,
+    mockupRendering: false,
+    fill: {
+      mode: "solid",
+      solidColor: "#000000",
+      angle: 0,
+      stops: [
+        { offset: 0, color: "#000000" },
+        { offset: 1, color: "#3b82f6" },
+      ],
+      selectedStop: 0,
+      loadedForId: null,
+    },
   };
 
   const el = {
@@ -55,6 +69,28 @@
     historyPendingDot: document.getElementById("history-pending-dot"),
     zoomIn: document.getElementById("zoom-in"),
     zoomOut: document.getElementById("zoom-out"),
+    fillSolidPanel: document.getElementById("fill-solid-panel"),
+    fillGradientPanel: document.getElementById("fill-gradient-panel"),
+    fillSolidPicker: document.getElementById("fill-solid-picker"),
+    fillSolidHex: document.getElementById("fill-solid-hex"),
+    gradBarWrap: document.getElementById("grad-bar-wrap"),
+    gradBar: document.getElementById("grad-bar"),
+    gradHandles: document.getElementById("grad-handles"),
+    gradAngleRow: document.getElementById("grad-angle-row"),
+    gradAngleRange: document.getElementById("grad-angle-range"),
+    gradAngleVal: document.getElementById("grad-angle-val"),
+    gradStopPicker: document.getElementById("grad-stop-picker"),
+    gradStopHex: document.getElementById("grad-stop-hex"),
+    gradStopOffset: document.getElementById("grad-stop-offset"),
+    gradRemoveStop: document.getElementById("grad-remove-stop"),
+    fillApplyBtn: document.getElementById("fill-apply-btn"),
+    fillStatus: document.getElementById("fill-status"),
+    mockupBrandName: document.getElementById("mockup-brand-name"),
+    mockupHeadline: document.getElementById("mockup-headline"),
+    mockupWebsite: document.getElementById("mockup-website"),
+    mockupAccent: document.getElementById("mockup-accent"),
+    mockupRenderBtn: document.getElementById("mockup-render-btn"),
+    mockupsStatus: document.getElementById("mockups-status"),
   };
 
   function isAwaitingAgent() {
@@ -367,16 +403,109 @@
       el.hexSwatch.style.background = state.view === "inverted" ? "#0b0c0e" : "#ffffff";
     }
 
+    const bust = state.assetBust ? `?v=${state.assetBust}` : "";
     if (state.view === "sheet" && cand.files.sheet_png) {
-      el.markImage.src = cand.files.sheet_png;
+      el.markImage.src = cand.files.sheet_png + bust;
     } else if (state.view === "grid" && cand.files.overlay_svg) {
-      el.markImage.src = cand.files.overlay_svg;
+      el.markImage.src = cand.files.overlay_svg + bust;
     } else {
-      el.markImage.src = cand.files.logo_svg;
+      el.markImage.src = cand.files.logo_svg + bust;
     }
 
+    syncFillFromCandidate(cand);
     renderMetrics(cand.metrics);
     renderPinsOnCanvas(cand);
+  }
+
+  function syncFillFromCandidate(cand) {
+    if (!cand || state.fill.loadedForId === cand.id) return;
+    state.fill.loadedForId = cand.id;
+    const rawFill = cand.spec && cand.spec.post && cand.spec.post.fill;
+    if (typeof rawFill === "string" && /^#[0-9a-fA-F]{6}$/.test(rawFill)) {
+      state.fill.mode = "solid";
+      state.fill.solidColor = rawFill.toLowerCase();
+    } else if (rawFill && typeof rawFill === "object" && Array.isArray(rawFill.stops) && rawFill.stops.length >= 2) {
+      state.fill.mode = rawFill.type === "radial" ? "radial" : "linear";
+      state.fill.angle = Number.isFinite(rawFill.angle_deg) ? Math.round(rawFill.angle_deg) : 0;
+      state.fill.stops = rawFill.stops.map((s) => ({
+        offset: Math.max(0, Math.min(1, Number(s.offset) || 0)),
+        color: /^#[0-9a-fA-F]{6}$/.test(s.color || "") ? s.color.toLowerCase() : "#000000",
+      }));
+      state.fill.selectedStop = 0;
+    } else {
+      state.fill.mode = "solid";
+      state.fill.solidColor = "#000000";
+    }
+    el.fillStatus.textContent = "";
+    renderFillControls();
+  }
+
+  function renderFillControls() {
+    const f = state.fill;
+    document.querySelectorAll("[data-fill-mode]").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.dataset.fillMode === f.mode);
+    });
+    const isSolid = f.mode === "solid";
+    el.fillSolidPanel.hidden = !isSolid;
+    el.fillGradientPanel.hidden = isSolid;
+    if (isSolid) {
+      el.fillSolidPicker.value = f.solidColor;
+      el.fillSolidHex.value = f.solidColor;
+      return;
+    }
+
+    el.gradAngleRow.hidden = f.mode === "radial";
+    el.gradAngleRange.value = String(f.angle);
+    el.gradAngleVal.textContent = `${f.angle}°`;
+
+    const sorted = f.stops.slice().sort((a, b) => a.offset - b.offset);
+    const stopStr = sorted.map((s) => `${s.color} ${Math.round(s.offset * 100)}%`).join(", ");
+    el.gradBar.style.background = `linear-gradient(90deg, ${stopStr})`;
+
+    el.gradHandles.innerHTML = "";
+    f.stops.forEach((stop, idx) => {
+      const handle = document.createElement("div");
+      handle.className = "grad-handle" + (idx === f.selectedStop ? " is-active" : "");
+      handle.style.left = `${Math.round(stop.offset * 100)}%`;
+      handle.style.background = stop.color;
+      handle.addEventListener("pointerdown", (evt) => {
+        evt.stopPropagation();
+        f.selectedStop = idx;
+        renderFillControls();
+        const barRect = el.gradBarWrap.getBoundingClientRect();
+        const onMove = (moveEvt) => {
+          const ratio = Math.max(0, Math.min(1, (moveEvt.clientX - barRect.left) / Math.max(1, barRect.width)));
+          f.stops[idx].offset = Math.round(ratio * 100) / 100;
+          renderFillControls();
+        };
+        const onUp = () => {
+          window.removeEventListener("pointermove", onMove);
+          window.removeEventListener("pointerup", onUp);
+        };
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
+      });
+      el.gradHandles.appendChild(handle);
+    });
+
+    const active = f.stops[f.selectedStop] || f.stops[0];
+    el.gradStopPicker.value = active.color;
+    el.gradStopHex.value = active.color;
+    el.gradStopOffset.textContent = `${Math.round(active.offset * 100)}%`;
+    el.gradRemoveStop.disabled = f.stops.length <= 2;
+  }
+
+  function buildFillPayload() {
+    const f = state.fill;
+    if (f.mode === "solid") return f.solidColor;
+    return {
+      type: f.mode,
+      angle_deg: f.angle,
+      stops: f.stops
+        .slice()
+        .sort((a, b) => a.offset - b.offset)
+        .map((s) => ({ offset: s.offset, color: s.color })),
+    };
   }
 
   function renderMetrics(metrics) {
@@ -523,8 +652,71 @@
     el.submitBtn.textContent = locked ? "Waiting for agent update" : "Submit Review";
   }
 
+  function syncMockupDefaults(cand) {
+    if (!cand || state.mockupDefaultsForId === cand.id) return;
+    state.mockupDefaultsForId = cand.id;
+    const spec = cand.spec || {};
+    const tokens = (state.session && state.session.tokens) || {};
+    el.mockupBrandName.value = spec.name || tokens.name || "Brandspec";
+    el.mockupHeadline.value = spec.concept || "Precision built for scale.";
+    if (!el.mockupWebsite.value) {
+      el.mockupWebsite.value = "brandspec.dev";
+    }
+    let accent = tokens.accent || "#2563eb";
+    const fill = spec.post && spec.post.fill;
+    if (typeof fill === "string" && !["#000000", "#111111", "#ffffff"].includes(fill.toLowerCase())) {
+      accent = fill;
+    } else if (fill && Array.isArray(fill.stops)) {
+      const found = fill.stops.find((s) => s.color && !["#000000", "#111111", "#ffffff"].includes(s.color.toLowerCase()));
+      if (found) accent = found.color;
+    }
+    if (/^#[0-9a-fA-F]{6}$/.test(accent)) {
+      el.mockupAccent.value = accent.toLowerCase();
+    }
+  }
+
+  async function triggerMockupRender(cand) {
+    if (!cand || state.mockupRendering) return;
+    state.mockupRendering = true;
+    el.mockupRenderBtn.disabled = true;
+    el.mockupsStatus.hidden = false;
+    el.mockupsStatus.textContent = "Rendering perspective mockups...";
+    try {
+      const resp = await fetch("/api/mockups/render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidate_id: cand.id,
+          brand_name: el.mockupBrandName.value.trim(),
+          headline: el.mockupHeadline.value.trim(),
+          website: el.mockupWebsite.value.trim(),
+          accent: el.mockupAccent.value,
+        }),
+      });
+      const body = await resp.json();
+      if (!resp.ok) {
+        el.mockupsStatus.textContent = body.error || "Failed to render mockups.";
+        return;
+      }
+      cand.mockups = body.mockups || [];
+      state.assetBust = Date.now();
+      el.mockupsStatus.hidden = true;
+      renderMockups();
+    } catch (err) {
+      el.mockupsStatus.textContent = `Error: ${err.message}`;
+    } finally {
+      state.mockupRendering = false;
+      el.mockupRenderBtn.disabled = false;
+    }
+  }
+
   function renderMockups() {
-    const hasMockups = Boolean(state.session && (state.session.tokens || state.session.kit));
+    const cand = activeCandidate();
+    const hasScenes = Boolean(
+      state.session &&
+        (state.session.has_mockup_templates || state.session.tokens || state.session.kit)
+    );
+    const hasMockups = Boolean(cand && hasScenes);
     el.modeTabs.hidden = !hasMockups;
     if (!hasMockups) {
       state.tab = "review";
@@ -534,50 +726,98 @@
     el.reviewWorkspace.hidden = showMockups;
     if (!showMockups) return;
 
+    syncMockupDefaults(cand);
     el.mockupsGrid.innerHTML = "";
+
+    const scenes = Array.isArray(cand.mockups) ? cand.mockups : [];
+    if (scenes.length === 0 && state.session.has_mockup_templates && !state.mockupRendering) {
+      triggerMockupRender(cand);
+      return;
+    }
+
+    const bust = state.assetBust ? `?v=${state.assetBust}` : "";
+    scenes.forEach((scene) => {
+      const card = document.createElement("div");
+      card.className = "mockup-card";
+
+      const head = document.createElement("div");
+      head.className = "mockup-scene-head";
+
+      const meta = document.createElement("div");
+      meta.className = "mockup-scene-meta";
+      const title = document.createElement("div");
+      title.className = "mockup-title";
+      title.textContent = scene.title;
+      const badge = document.createElement("span");
+      badge.className = "mockup-badge";
+      badge.textContent = scene.category;
+      meta.appendChild(title);
+      meta.appendChild(badge);
+
+      const dl = document.createElement("a");
+      dl.className = "mockup-download";
+      dl.href = scene.url + bust;
+      dl.download = `${cand.id}-${scene.id}.jpg`;
+      dl.textContent = "Download";
+
+      head.appendChild(meta);
+      head.appendChild(dl);
+
+      const img = document.createElement("img");
+      img.className = "mockup-scene-img";
+      img.src = scene.url + bust;
+      img.alt = scene.title;
+      img.loading = "lazy";
+
+      card.appendChild(head);
+      card.appendChild(img);
+      el.mockupsGrid.appendChild(card);
+    });
+
     const kit = state.session.kit || {};
     const tokens = state.session.tokens || {};
-    const cand = activeCandidate();
     const markSrc = kit["logo-light.svg"] || (cand && cand.files.logo_svg) || "";
 
-    const navCard = document.createElement("div");
-    navCard.className = "mockup-card";
-    const navTitle = document.createElement("div");
-    navTitle.className = "mockup-title";
-    navTitle.textContent = "Navbar and Favicon Tab";
-    const tabBar = document.createElement("div");
-    tabBar.className = "mockup-tab";
-    if (kit["favicon.ico"]) {
-      const fav = document.createElement("img");
-      fav.src = kit["favicon.ico"];
-      fav.width = 16;
-      fav.height = 16;
-      fav.alt = "Favicon";
-      tabBar.appendChild(fav);
-    }
-    const tabText = document.createElement("span");
-    tabText.textContent = tokens.name || "Brandspec";
-    tabBar.appendChild(tabText);
+    if (state.session.tokens || state.session.kit) {
+      const navCard = document.createElement("div");
+      navCard.className = "mockup-card";
+      const navTitle = document.createElement("div");
+      navTitle.className = "mockup-title";
+      navTitle.textContent = "Navbar and Favicon Tab";
+      const tabBar = document.createElement("div");
+      tabBar.className = "mockup-tab";
+      if (kit["favicon.ico"]) {
+        const fav = document.createElement("img");
+        fav.src = kit["favicon.ico"];
+        fav.width = 16;
+        fav.height = 16;
+        fav.alt = "Favicon";
+        tabBar.appendChild(fav);
+      }
+      const tabText = document.createElement("span");
+      tabText.textContent = tokens.name || "Brandspec";
+      tabBar.appendChild(tabText);
 
-    const navbar = document.createElement("div");
-    navbar.className = "mockup-navbar";
-    navbar.style.background = tokens.bg_surface || "#121316";
-    navbar.style.color = tokens.text_primary || "#f3f4f6";
-    if (markSrc) {
-      const logo = document.createElement("img");
-      logo.src = markSrc;
-      logo.width = 24;
-      logo.height = 24;
-      logo.alt = "Navbar mark";
-      navbar.appendChild(logo);
+      const navbar = document.createElement("div");
+      navbar.className = "mockup-navbar";
+      navbar.style.background = tokens.bg_surface || "#121316";
+      navbar.style.color = tokens.text_primary || "#f3f4f6";
+      if (markSrc) {
+        const logo = document.createElement("img");
+        logo.src = markSrc;
+        logo.width = 24;
+        logo.height = 24;
+        logo.alt = "Navbar mark";
+        navbar.appendChild(logo);
+      }
+      const navLinks = document.createElement("span");
+      navLinks.textContent = "Docs   Releases   Studio";
+      navbar.appendChild(navLinks);
+      navCard.appendChild(navTitle);
+      navCard.appendChild(tabBar);
+      navCard.appendChild(navbar);
+      el.mockupsGrid.appendChild(navCard);
     }
-    const navLinks = document.createElement("span");
-    navLinks.textContent = "Docs   Releases   Studio";
-    navbar.appendChild(navLinks);
-    navCard.appendChild(navTitle);
-    navCard.appendChild(tabBar);
-    navCard.appendChild(navbar);
-    el.mockupsGrid.appendChild(navCard);
 
     if (kit["icon-192.png"] || kit["icon-maskable-512.png"]) {
       const iconCard = document.createElement("div");
@@ -786,6 +1026,96 @@
     renumberPins();
     state.focusedPinIndex = state.pins.length - 1;
     renderAll(true);
+  });
+
+  document.querySelectorAll("[data-fill-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.fill.mode = btn.dataset.fillMode;
+      renderFillControls();
+    });
+  });
+
+  el.fillSolidPicker.addEventListener("input", () => {
+    state.fill.solidColor = el.fillSolidPicker.value.toLowerCase();
+    el.fillSolidHex.value = state.fill.solidColor;
+  });
+
+  el.fillSolidHex.addEventListener("input", () => {
+    const val = el.fillSolidHex.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      state.fill.solidColor = val.toLowerCase();
+      el.fillSolidPicker.value = state.fill.solidColor;
+    }
+  });
+
+  el.gradAngleRange.addEventListener("input", () => {
+    state.fill.angle = Number(el.gradAngleRange.value) || 0;
+    el.gradAngleVal.textContent = `${state.fill.angle}°`;
+  });
+
+  el.gradBarWrap.addEventListener("click", (evt) => {
+    if (evt.target.classList.contains("grad-handle")) return;
+    const rect = el.gradBarWrap.getBoundingClientRect();
+    const offset = Math.round(Math.max(0, Math.min(1, (evt.clientX - rect.left) / Math.max(1, rect.width))) * 100) / 100;
+    const active = state.fill.stops[state.fill.selectedStop] || state.fill.stops[0];
+    state.fill.stops.push({ offset, color: active.color });
+    state.fill.selectedStop = state.fill.stops.length - 1;
+    renderFillControls();
+  });
+
+  el.gradStopPicker.addEventListener("input", () => {
+    const stop = state.fill.stops[state.fill.selectedStop];
+    if (!stop) return;
+    stop.color = el.gradStopPicker.value.toLowerCase();
+    renderFillControls();
+  });
+
+  el.gradStopHex.addEventListener("input", () => {
+    const val = el.gradStopHex.value.trim();
+    const stop = state.fill.stops[state.fill.selectedStop];
+    if (stop && /^#[0-9a-fA-F]{6}$/.test(val)) {
+      stop.color = val.toLowerCase();
+      renderFillControls();
+    }
+  });
+
+  el.gradRemoveStop.addEventListener("click", () => {
+    if (state.fill.stops.length <= 2) return;
+    state.fill.stops.splice(state.fill.selectedStop, 1);
+    state.fill.selectedStop = Math.max(0, state.fill.selectedStop - 1);
+    renderFillControls();
+  });
+
+  el.fillApplyBtn.addEventListener("click", async () => {
+    const cand = activeCandidate();
+    if (!cand || isAwaitingAgent()) return;
+    el.fillApplyBtn.disabled = true;
+    el.fillStatus.textContent = "Applying...";
+    try {
+      const resp = await fetch("/api/candidate/fill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidate_id: cand.id, fill: buildFillPayload() }),
+      });
+      const body = await resp.json();
+      if (!resp.ok) {
+        el.fillStatus.textContent = body.error || "Failed";
+        return;
+      }
+      state.assetBust = Date.now();
+      state.fill.loadedForId = null;
+      el.fillStatus.textContent = "Saved";
+      await loadSession();
+    } catch (err) {
+      el.fillStatus.textContent = err.message;
+    } finally {
+      el.fillApplyBtn.disabled = false;
+    }
+  });
+
+  el.mockupRenderBtn.addEventListener("click", () => {
+    const cand = activeCandidate();
+    if (cand) triggerMockupRender(cand);
   });
 
   el.submitBtn.addEventListener("click", async () => {

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "highway-billboard",
+  "title": "Highway Billboard",
+  "category": "outdoor",
+  "background": "background.jpg",
+  "slots": [
+    {
+      "id": "main",
+      "quad": [[176, 272], [1036, 228], [1060, 508], [152, 540]],
+      "design_size": [1600, 560],
+      "template_style": "billboard_split",
+      "blend_mode": "luminance_transfer",
+      "opacity": 0.96
+    }
+  ]
+}

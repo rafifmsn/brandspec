@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "concourse-lightbox",
+  "title": "Concourse Wide Lightbox",
+  "category": "outdoor",
+  "background": "background.jpg",
+  "slots": [
+    {
+      "id": "main",
+      "quad": [[220, 160], [888, 288], [892, 452], [220, 524]],
+      "design_size": [1800, 520],
+      "template_style": "billboard_split",
+      "blend_mode": "luminance_transfer",
+      "opacity": 0.96
+    }
+  ]
+}

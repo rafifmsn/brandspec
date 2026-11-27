@@ -24,6 +24,8 @@ class CompiledWordmark:
     svg_d: str
     svg_markup: str
     baseline_y_design: float
+    cap_height_design: float
+    x_height_design: float
     contour_count: int
 
 
@@ -173,6 +175,11 @@ def compile_wordmark(spec: WordmarkSpec, base_dir: Path | None = None) -> Compil
         upem = float(font["head"].unitsPerEm)
         hmtx = font["hmtx"]
         kern_table = _font_kern_pairs(font)
+        os2 = font["OS/2"] if "OS/2" in font else None
+        hhea = font["hhea"] if "hhea" in font else None
+        ascent_units = float(getattr(hhea, "ascent", upem * 0.8))
+        raw_cap = float(getattr(os2, "sCapHeight", 0) or (ascent_units * 0.9))
+        raw_xh = float(getattr(os2, "sxHeight", 0) or (raw_cap * 0.7))
 
         rendered_text = _apply_case(spec.text, spec.case)
         scale = (spec.em_units * spec.unit) / upem
@@ -260,7 +267,7 @@ def compile_wordmark(spec: WordmarkSpec, base_dir: Path | None = None) -> Compil
     norm_path = pathops.simplify(norm_path, fix_winding=True)
 
     svg_d = path_to_svg_d(norm_path, spec.post.precision)
-    svg_markup = render_svg_doc(svg_d, canvas, fill="#000000", title=spec.name)
+    svg_markup = render_svg_doc(svg_d, canvas, fill=spec.post.fill, title=spec.name)
     return CompiledWordmark(
         spec=spec,
         design_path=design_path,
@@ -268,5 +275,7 @@ def compile_wordmark(spec: WordmarkSpec, base_dir: Path | None = None) -> Compil
         svg_d=svg_d,
         svg_markup=svg_markup,
         baseline_y_design=baseline_y_design,
+        cap_height_design=raw_cap * scale,
+        x_height_design=raw_xh * scale,
         contour_count=len(list(norm_path.contours)),
     )

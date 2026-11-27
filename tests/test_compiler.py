@@ -224,3 +224,64 @@ def test_dilate_path_edge_cases() -> None:
         dilate_path(open_path, 10.0, join="invalid")  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="halo cap"):
         dilate_path(open_path, 10.0, cap="invalid")  # type: ignore[arg-type]
+
+
+def test_solid_and_gradient_fills_compile_deterministically() -> None:
+    base = {
+        "name": "Fill Test",
+        "concept": "Color and gradient fill check",
+        "unit": 40,
+        "layers": [
+            {
+                "id": "disc",
+                "op": "unite",
+                "shapes": [{"type": "ring", "center": [0, 0], "outer_radius": 3, "inner_radius": 1.5}],
+            }
+        ],
+    }
+
+    light_spec = MarkSpec.model_validate({**base, "post": {"fill": "#f5f5f5"}})
+    light_compiled = compile_spec(light_spec)
+    assert 'fill="#f5f5f5"' in light_compiled.svg_markup
+    light_metrics = analyze_compiled(light_compiled)
+    assert light_metrics.passed
+    assert light_metrics.ink_ratio > 0.5
+
+    grad_spec = MarkSpec.model_validate(
+        {
+            **base,
+            "post": {
+                "fill": {
+                    "type": "linear",
+                    "angle_deg": 45,
+                    "stops": [
+                        {"offset": 0.0, "color": "#112233"},
+                        {"offset": 1.0, "color": "#44aaff"},
+                    ],
+                }
+            },
+        }
+    )
+    first = compile_spec(grad_spec)
+    second = compile_spec(grad_spec)
+    assert first.svg_markup == second.svg_markup
+    assert '<linearGradient id="brand-fill"' in first.svg_markup
+    assert 'fill="url(#brand-fill)"' in first.svg_markup
+    assert analyze_compiled(first).passed
+
+    radial_spec = MarkSpec.model_validate(
+        {
+            **base,
+            "post": {
+                "fill": {
+                    "type": "radial",
+                    "stops": [
+                        {"offset": 0.0, "color": "#ff0055"},
+                        {"offset": 1.0, "color": "#110022"},
+                    ],
+                }
+            },
+        }
+    )
+    radial_compiled = compile_spec(radial_spec)
+    assert '<radialGradient id="brand-fill"' in radial_compiled.svg_markup

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "stacked-cards",
+  "title": "Stacked Business Cards",
+  "category": "print",
+  "background": "background.jpg",
+  "slots": [
+    {
+      "id": "main",
+      "quad": [[454, 160], [952, 364], [704, 578], [236, 368]],
+      "design_size": [1050, 600],
+      "template_style": "card_minimal",
+      "blend_mode": "multiply",
+      "opacity": 0.92
+    }
+  ]
+}

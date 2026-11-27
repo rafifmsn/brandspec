@@ -289,3 +289,41 @@ def test_inverse_grid_math_roundtrip() -> None:
         c_a, c_b = canvas_to_grid(px, py, affine, grid, unit)
         assert math.isclose(c_a, pt[0], abs_tol=1e-3)
         assert math.isclose(c_b, pt[1], abs_tol=1e-3)
+
+
+def test_post_candidate_fill_updates_spec_and_svg(tmp_path: Path) -> None:
+    build_dir = tmp_path / "fill-mark"
+    assert (
+        main(["build", str(ARCHETYPES_DIR / "iso-impossible.json"), "--out-dir", str(build_dir)])
+        == 0
+    )
+
+    server, _ = create_studio_server(build_dir, port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = server.server_address[1]
+        status, body = _http_json(
+            f"http://127.0.0.1:{port}/api/candidate/fill",
+            method="POST",
+            payload={
+                "candidate_id": "default",
+                "fill": {
+                    "type": "linear",
+                    "angle_deg": 90,
+                    "stops": [
+                        {"offset": 0.0, "color": "#2563eb"},
+                        {"offset": 1.0, "color": "#06b6d4"},
+                    ],
+                },
+            },
+        )
+        assert status == 200
+        assert body["fill"]["type"] == "linear"
+        svg_text = (build_dir / "logo.svg").read_text(encoding="utf-8")
+        assert '<linearGradient id="brand-fill"' in svg_text
+        saved_spec = json.loads((build_dir / "spec.json").read_text(encoding="utf-8"))
+        assert saved_spec["post"]["fill"]["stops"][0]["color"] == "#2563eb"
+    finally:
+        server.shutdown()
+        server.server_close()

@@ -23,6 +23,7 @@ from .engines.mark.artifacts import write_mark_artifacts
 from .engines.mark.compiler import compile_spec
 from .engines.mark.schema import MarkSpec
 from .engines.mark.sweep import SweepSpec, merge_axes, run_sweep
+from .engines.mockup import MockupContext, discover_templates, render_all_mockups
 from .engines.pattern.compiler import compile_pattern
 from .engines.pattern.schema import PatternSpec
 from .engines.tokens.contrast import audit_tokens_contrast
@@ -30,7 +31,7 @@ from .engines.tokens.extract import extract_tokens_from_image
 from .engines.tokens.schema import TokensSpec
 from .engines.wordmark.compiler import compile_wordmark
 from .engines.wordmark.schema import WordmarkSpec
-from .inspect import analyze_compiled
+from .inspect import analyze_compiled, render_inspection_sheet
 from .studio.server import create_studio_server
 
 
@@ -351,6 +352,7 @@ def cmd_wordmark_build(args: argparse.Namespace) -> int:
 
     wordmark_svg.write_text(compiled.svg_markup, encoding="utf-8")
     logo_svg.write_text(compiled.svg_markup, encoding="utf-8")
+    render_inspection_sheet(compiled).save(out_dir / "sheet.png", format="PNG")
     metrics_file.write_text(json.dumps(metrics.to_dict(), indent=2) + "\n", encoding="utf-8")
     spec_file.write_text(
         json.dumps(spec.model_dump(mode="json", exclude_none=True), indent=2) + "\n",
@@ -406,6 +408,7 @@ def cmd_lockup_build(args: argparse.Namespace) -> int:
     lockup_svg.write_text(compiled.svg_markup, encoding="utf-8")
     clearspace_svg.write_text(compiled.clearspace_svg_markup, encoding="utf-8")
     logo_svg.write_text(compiled.svg_markup, encoding="utf-8")
+    render_inspection_sheet(compiled).save(out_dir / "sheet.png", format="PNG")
     metrics_file.write_text(json.dumps(metrics.to_dict(), indent=2) + "\n", encoding="utf-8")
     spec_file.write_text(
         json.dumps(spec.model_dump(mode="json", exclude_none=True), indent=2) + "\n",
@@ -516,6 +519,91 @@ def cmd_pattern_build(args: argparse.Namespace) -> int:
             indent=2,
         )
     )
+    return 0
+
+
+def _extract_accent_from_spec(spec_data: dict) -> str | None:
+    fill = spec_data.get("post", {}).get("fill")
+    if isinstance(fill, str) and fill.lower() not in {"#000000", "#111111", "#ffffff"}:
+        return fill
+    if isinstance(fill, dict):
+        for stop in fill.get("stops", []):
+            c = str(stop.get("color", "")).lower()
+            if c and c not in {"#000000", "#111111", "#ffffff"}:
+                return c
+    return None
+
+
+def cmd_mockup_list(_args: argparse.Namespace) -> int:
+    for _tdir, manifest in discover_templates():
+        print(f"{manifest.id:22s} [{manifest.category:9s}] {manifest.title} ({len(manifest.slots)} slot(s))")
+    return 0
+
+
+def cmd_mockup_build(args: argparse.Namespace) -> int:
+    target = Path(args.target)
+    spec_data: dict = {}
+    if target.is_dir():
+        svg_path = target / "logo.svg"
+        if not svg_path.is_file():
+            print(f"Mockup error: no logo.svg found in {target}", file=sys.stderr)
+            return 1
+        logo_svg = svg_path.read_text(encoding="utf-8")
+        spec_file = target / "spec.json"
+        if spec_file.is_file():
+            spec_data = json.loads(spec_file.read_text(encoding="utf-8"))
+        base_dir = target
+    elif target.suffix.lower() == ".svg" and target.is_file():
+        logo_svg = target.read_text(encoding="utf-8")
+        base_dir = target.parent
+    elif target.is_file():
+        try:
+            spec_data = json.loads(target.read_text(encoding="utf-8"))
+            mark_spec = MarkSpec.model_validate(spec_data)
+            logo_svg = compile_spec(mark_spec).svg_markup
+        except (OSError, json.JSONDecodeError, ValidationError, ValueError) as exc:
+            print(f"Mockup error: {exc}", file=sys.stderr)
+            return 1
+        base_dir = target.parent
+    else:
+        print(f"Mockup error: target not found: {target}", file=sys.stderr)
+        return 1
+
+    tokens_data: dict = {}
+    tokens_path = Path(args.tokens) if args.tokens else (base_dir / "tokens.spec.json")
+    if tokens_path.is_file():
+        try:
+            tokens = TokensSpec.model_validate(json.loads(tokens_path.read_text(encoding="utf-8")))
+            tokens_data = tokens.model_dump(mode="json")
+        except (OSError, json.JSONDecodeError, ValidationError) as exc:
+            print(f"Mockup tokens error: {exc}", file=sys.stderr)
+            return 1
+
+    accent = (
+        args.accent
+        or tokens_data.get("accent")
+        or _extract_accent_from_spec(spec_data)
+        or "#2563eb"
+    )
+    ctx = MockupContext(
+        brand_name=args.brand_name or spec_data.get("name") or tokens_data.get("name") or "Brandspec",
+        headline=args.headline or spec_data.get("concept") or "Precision built for scale.",
+        tagline=args.tagline or "Deterministic identity across every surface.",
+        website=args.website or "brandspec.dev",
+        accent=accent,
+        surface_dark=tokens_data.get("bg_canvas", "#111318"),
+        text_light=tokens_data.get("text_primary", "#f9fafb"),
+    )
+
+    only_ids = (
+        {part.strip() for part in args.templates.split(",") if part.strip()}
+        if args.templates
+        else None
+    )
+    out_dir = Path(args.out_dir) if args.out_dir else (base_dir / "mockups")
+    records = render_all_mockups(logo_svg, out_dir, ctx=ctx, only_ids=only_ids)
+    (out_dir / "mockups.json").write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps({"out_dir": str(out_dir), "count": len(records), "mockups": records}, indent=2))
     return 0
 
 
@@ -656,6 +744,22 @@ def main(argv: list[str] | None = None) -> int:
     p_pat_build.add_argument("spec", help="Path to pattern.spec.json")
     p_pat_build.add_argument("--out-dir", help="Output directory")
     p_pat_build.set_defaults(func=cmd_pattern_build)
+
+    p_mockup = sub.add_parser("mockup", help="Render brand marks onto perspective mockup scenes")
+    mockup_sub = p_mockup.add_subparsers(dest="mockup_command", required=True)
+    p_mockup_list = mockup_sub.add_parser("list", help="List available mockup scene templates")
+    p_mockup_list.set_defaults(func=cmd_mockup_list)
+    p_mockup_build = mockup_sub.add_parser("build", help="Composite mark onto mockup templates")
+    p_mockup_build.add_argument("target", help="Compiled out dir, logo.svg, or mark spec.json")
+    p_mockup_build.add_argument("--tokens", help="Optional tokens.spec.json path")
+    p_mockup_build.add_argument("--brand-name", help="Brand display name for layouts")
+    p_mockup_build.add_argument("--headline", help="Primary billboard/banner headline")
+    p_mockup_build.add_argument("--tagline", help="Secondary tagline")
+    p_mockup_build.add_argument("--website", help="Display website URL")
+    p_mockup_build.add_argument("--accent", help="Accent hex color (#RRGGBB)")
+    p_mockup_build.add_argument("--templates", help="Comma-separated template IDs to render")
+    p_mockup_build.add_argument("--out-dir", help="Output directory")
+    p_mockup_build.set_defaults(func=cmd_mockup_build)
 
     args = parser.parse_args(argv)
     return args.func(args)

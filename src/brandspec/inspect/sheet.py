@@ -69,8 +69,22 @@ def _count_islands(mask: np.ndarray) -> tuple[int, int]:
 
 
 def analyze_compiled(compiled: CompiledMark) -> QualityMetrics:
-    """Compute geometric & visual quality metrics directly from rasterized output."""
-    pos_img = _rasterize(compiled.svg_markup, 240, background="#ffffff").convert("L")
+    """Compute geometric & visual quality metrics from a black silhouette pass."""
+    if hasattr(compiled, "svg_d") and hasattr(compiled, "spec"):
+        canvas_size = (
+            compiled.spec.post.canvas_size
+            if hasattr(compiled.spec, "post")
+            else getattr(compiled.spec, "canvas_size", 1000)
+        )
+        silhouette_svg = render_svg_doc(
+            compiled.svg_d,
+            canvas_size,
+            fill="#000000",
+            background="#ffffff",
+        )
+    else:
+        silhouette_svg = compiled.svg_markup
+    pos_img = _rasterize(silhouette_svg, 240, background="#ffffff").convert("L")
     arr = np.asarray(pos_img)
     ink = arr < 128
 
@@ -99,7 +113,7 @@ def analyze_compiled(compiled: CompiledMark) -> QualityMetrics:
 
     islands, tiny = _count_islands(ink)
 
-    img_24 = _rasterize(compiled.svg_markup, 24, background="#ffffff").convert("L")
+    img_24 = _rasterize(silhouette_svg, 24, background="#ffffff").convert("L")
     arr_24 = np.asarray(img_24)
     ink_24 = float(np.mean(arr_24 < 160))
 
@@ -130,18 +144,33 @@ def analyze_compiled(compiled: CompiledMark) -> QualityMetrics:
     )
 
 
-def render_inspection_sheet(compiled: CompiledMark) -> Image.Image:
-    """Build a 4-panel visual inspection sheet (grid, positive, inverted, scale strip)."""
-    canvas_size = compiled.spec.post.canvas_size
+def render_inspection_sheet(compiled: object) -> Image.Image:
+    """Build a 4-panel visual inspection sheet for marks, wordmarks, or lockups."""
+    spec = compiled.spec  # type: ignore[attr-defined]
+    canvas_size = (
+        spec.post.canvas_size
+        if hasattr(spec, "post")
+        else getattr(spec, "canvas_size", 1000)
+    )
     panel_size = 400
     pad = 24
     header_h = 36
 
-    p1 = _rasterize(compiled.overlay_svg_markup, panel_size, background="#ffffff")
-    p2 = _rasterize(compiled.svg_markup, panel_size, background="#ffffff")
+    if hasattr(compiled, "overlay_svg_markup"):
+        p1_svg = compiled.overlay_svg_markup  # type: ignore[attr-defined]
+        p1_label = "1. Construction Grid"
+    elif hasattr(compiled, "clearspace_svg_markup"):
+        p1_svg = compiled.clearspace_svg_markup  # type: ignore[attr-defined]
+        p1_label = "1. Clearspace Guides"
+    else:
+        p1_svg = compiled.svg_markup  # type: ignore[attr-defined]
+        p1_label = "1. Geometry"
+
+    p1 = _rasterize(p1_svg, panel_size, background="#ffffff")
+    p2 = _rasterize(compiled.svg_markup, panel_size, background="#ffffff")  # type: ignore[attr-defined]
 
     inv_svg = render_svg_doc(
-        compiled.svg_d,
+        compiled.svg_d,  # type: ignore[attr-defined]
         canvas_size,
         fill="#ffffff",
         background="#111111",
@@ -149,9 +178,9 @@ def render_inspection_sheet(compiled: CompiledMark) -> Image.Image:
     p3 = _rasterize(inv_svg, panel_size, background="#111111")
 
     strip = Image.new("RGB", (panel_size, panel_size), (245, 246, 248))
-    s96 = _rasterize(compiled.svg_markup, 96, background="#ffffff")
-    s48 = _rasterize(compiled.svg_markup, 48, background="#ffffff")
-    s24 = _rasterize(compiled.svg_markup, 24, background="#ffffff")
+    s96 = _rasterize(compiled.svg_markup, 96, background="#ffffff")  # type: ignore[attr-defined]
+    s48 = _rasterize(compiled.svg_markup, 48, background="#ffffff")  # type: ignore[attr-defined]
+    s24 = _rasterize(compiled.svg_markup, 24, background="#ffffff")  # type: ignore[attr-defined]
 
     strip.paste(s96, (48, 84))
     strip.paste(s48, (188, 108))
@@ -170,14 +199,21 @@ def render_inspection_sheet(compiled: CompiledMark) -> Image.Image:
     sheet = Image.new("RGB", (total_w, total_h), (236, 239, 244))
     draw = ImageDraw.Draw(sheet)
 
+    if hasattr(spec, "category") and hasattr(spec, "grid"):
+        header_meta = f"{spec.category}  |  grid={spec.grid.type}"
+    elif hasattr(spec, "layout"):
+        header_meta = f"lockup ({spec.layout})  |  align={spec.align}"
+    else:
+        header_meta = "wordmark"
+
     draw.text(
         (pad, 12),
-        f"{compiled.spec.name}  |  {compiled.spec.category}  |  grid={compiled.spec.grid.type}",
+        f"{spec.name}  |  {header_meta}",
         fill=(25, 28, 32),
     )
 
     positions = [
-        (pad, header_h + pad, p1, "1. Construction Grid"),
+        (pad, header_h + pad, p1, p1_label),
         (pad * 2 + panel_size, header_h + pad, p2, "2. Positive (400px)"),
         (pad, header_h + pad * 2 + panel_size, p3, "3. Inverted (400px)"),
         (pad * 2 + panel_size, header_h + pad * 2 + panel_size, strip, "4. Scale Test (96 / 48 / 24px)"),

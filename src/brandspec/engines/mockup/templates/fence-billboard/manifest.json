@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "fence-billboard",
+  "title": "City Fence Billboard",
+  "category": "outdoor",
+  "background": "background.jpg",
+  "slots": [
+    {
+      "id": "main",
+      "quad": [[248, 204], [948, 284], [960, 624], [248, 712]],
+      "design_size": [1400, 740],
+      "template_style": "billboard_split",
+      "blend_mode": "luminance_transfer",
+      "opacity": 0.96
+    }
+  ]
+}

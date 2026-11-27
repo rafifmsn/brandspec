@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import math
-from typing import Literal
+import re
+from typing import Annotated, Literal, Union
 
 import pathops
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 
 from .grid import Point2D
 
@@ -43,12 +44,39 @@ class SymmetrySpec(BaseModel):
     offset: float = 0.0
 
 
+HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _validate_hex_color(value: str) -> str:
+    if not HEX_COLOR_RE.match(value):
+        raise ValueError(f"Expected #RRGGBB hex color, got {value!r}")
+    return value.lower()
+
+
+HexColorStr = Annotated[str, AfterValidator(_validate_hex_color)]
+
+
+class GradientStop(BaseModel):
+    offset: float = Field(ge=0.0, le=1.0)
+    color: HexColorStr
+
+
+class GradientSpec(BaseModel):
+    type: Literal["linear", "radial"] = "linear"
+    angle_deg: float = 0.0
+    stops: list[GradientStop] = Field(min_length=2)
+
+
+FillSpec = Union[HexColorStr, GradientSpec]
+
+
 class PostProcessSpec(BaseModel):
     canvas_size: int = Field(default=1000, ge=256, le=4096)
     padding: float = Field(default=100.0, ge=0.0)
     optical_center: bool = True
     invert: bool = False
     precision: int = Field(default=2, ge=0, le=5)
+    fill: FillSpec = "#000000"
 
 
 def circle_path(cx: float, cy: float, radius: float) -> pathops.Path:
@@ -270,10 +298,40 @@ def path_to_svg_d(path: pathops.Path, precision: int = 2) -> str:
     return " ".join(parts)
 
 
+def render_fill_defs_and_attr(
+    fill: FillSpec | str | None,
+    grad_id: str = "brand-fill",
+) -> tuple[str, str]:
+    """Return SVG <defs> markup (if gradient) and the fill attribute value."""
+    if fill is None:
+        return "", "#000000"
+    if isinstance(fill, str):
+        return "", fill
+    stops_xml = "".join(
+        f'<stop offset="{round(stop.offset * 100.0, 2)}%" stop-color="{stop.color}"/>'
+        for stop in sorted(fill.stops, key=lambda s: s.offset)
+    )
+    if fill.type == "radial":
+        defs = f'<defs><radialGradient id="{grad_id}" cx="50%" cy="50%" r="50%">{stops_xml}</radialGradient></defs>'
+        return defs, f"url(#{grad_id})"
+    rad = math.radians(fill.angle_deg)
+    dx = 0.5 * math.cos(rad)
+    dy = 0.5 * math.sin(rad)
+    x1 = round((0.5 - dx) * 100.0, 2)
+    y1 = round((0.5 - dy) * 100.0, 2)
+    x2 = round((0.5 + dx) * 100.0, 2)
+    y2 = round((0.5 + dy) * 100.0, 2)
+    defs = (
+        f'<defs><linearGradient id="{grad_id}" '
+        f'x1="{x1}%" y1="{y1}%" x2="{x2}%" y2="{y2}%">{stops_xml}</linearGradient></defs>'
+    )
+    return defs, f"url(#{grad_id})"
+
+
 def render_svg_doc(
     svg_d: str,
     canvas_size: int,
-    fill: str = "#000000",
+    fill: FillSpec | str = "#000000",
     background: str | None = None,
     extra_before: str = "",
     title: str = "",
@@ -281,11 +339,12 @@ def render_svg_doc(
     """Wrap an SVG path string into a standalone SVG document."""
     bg = f'<rect width="{canvas_size}" height="{canvas_size}" fill="{background}"/>' if background else ""
     title_el = f"<title>{title}</title>" if title else ""
+    defs_el, fill_attr = render_fill_defs_and_attr(fill)
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
         f'viewBox="0 0 {canvas_size} {canvas_size}" '
         f'width="{canvas_size}" height="{canvas_size}">'
-        f"{title_el}{bg}{extra_before}"
-        f'<path d="{svg_d}" fill="{fill}" fill-rule="nonzero"/>'
+        f"{title_el}{defs_el}{bg}{extra_before}"
+        f'<path d="{svg_d}" fill="{fill_attr}" fill-rule="nonzero"/>'
         f"</svg>"
     )

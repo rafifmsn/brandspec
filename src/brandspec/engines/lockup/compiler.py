@@ -3,12 +3,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import io
 import json
 from pathlib import Path
 
+import numpy as np
 import pathops
+from PIL import Image
+import resvg_py
 
-from ...core.paths import add_rounded_polygon, path_to_svg_d, render_svg_doc
+from ...core.paths import (
+    FillSpec,
+    add_rounded_polygon,
+    path_to_svg_d,
+    render_fill_defs_and_attr,
+    render_svg_doc,
+)
 from ..mark.compiler import compile_mark_design_path
 from ..mark.schema import MarkSpec
 from ..wordmark.compiler import compile_wordmark
@@ -40,6 +50,46 @@ def _translate_to_origin_top_left(path: pathops.Path) -> tuple[pathops.Path, flo
     return path.transform(1.0, 0.0, 0.0, 1.0, -min_x, -min_y), max_x - min_x, max_y - min_y
 
 
+def _ink_centroid_ratio(path: pathops.Path, w: float, h: float) -> tuple[float, float]:
+    """Return normalized (cx, cy) in [0, 1] of path ink inside its top-left box."""
+    size = 96
+    scale = size / max(w, h, 1e-6)
+    norm = path.transform(scale, 0.0, 0.0, scale, 0.0, 0.0)
+    svg_d = path_to_svg_d(norm, 2)
+    doc = render_svg_doc(svg_d, size, fill="#000000", background="#ffffff")
+    png_bytes = resvg_py.svg_to_bytes(svg_string=doc, width=size, height=size)
+    arr = np.asarray(Image.open(io.BytesIO(png_bytes)).convert("L"))
+    ys, xs = np.nonzero(arr < 128)
+    if len(xs) == 0:
+        return (0.5, 0.5)
+    bw = max(1.0, w * scale)
+    bh = max(1.0, h * scale)
+    return (float(np.mean(xs)) / bw, float(np.mean(ys)) / bh)
+
+
+def _render_multi_fill_lockup_svg(
+    m_d: str,
+    w_d: str,
+    m_fill: FillSpec,
+    w_fill: FillSpec,
+    canvas: int,
+    title: str,
+    badge_d: str | None = None,
+) -> str:
+    m_defs, m_attr = render_fill_defs_and_attr(m_fill, grad_id="lockup-mark-fill")
+    w_defs, w_attr = render_fill_defs_and_attr(w_fill, grad_id="lockup-wordmark-fill")
+    defs = f"{m_defs}{w_defs}"
+    badge_el = f'<path d="{badge_d}" fill="{w_attr}" fill-rule="nonzero"/>' if badge_d else ""
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'viewBox="0 0 {canvas} {canvas}" width="{canvas}" height="{canvas}">'
+        f"<title>{title}</title>{defs}"
+        f'<g><path d="{m_d}" fill="{m_attr}" fill-rule="nonzero"/>'
+        f'<path d="{w_d}" fill="{w_attr}" fill-rule="nonzero"/>{badge_el}</g>'
+        f"</svg>"
+    )
+
+
 def compile_lockup(spec: LockupSpec, base_dir: Path) -> CompiledLockup:
     """Compile a LockupSpec pairing mark and wordmark into lockup and clearspace SVGs."""
     mark_path = _resolve_rel(base_dir, spec.mark_spec)
@@ -66,29 +116,63 @@ def compile_lockup(spec: LockupSpec, base_dir: Path) -> CompiledLockup:
             # Align mark bottom edge with wordmark baseline
             m_y = max(0.0, wm_baseline_from_top - mh)
             w_y = max(0.0, mh - wm_baseline_from_top)
+        elif spec.align == "cap_height":
+            m_mid = 0.5 * mh
+            w_mid = wm_baseline_from_top - 0.5 * wm_compiled.cap_height_design
+            m_y = max(0.0, w_mid - m_mid)
+            w_y = max(0.0, m_mid - w_mid)
+        elif spec.align == "x_height":
+            m_mid = 0.5 * mh
+            w_mid = wm_baseline_from_top - 0.5 * wm_compiled.x_height_design
+            m_y = max(0.0, w_mid - m_mid)
+            w_y = max(0.0, m_mid - w_mid)
+        elif spec.align == "optical_center":
+            _, m_cy = _ink_centroid_ratio(m_tl, mw, mh)
+            _, w_cy = _ink_centroid_ratio(w_tl, ww, wh)
+            m_anchor = m_cy * mh
+            w_anchor = w_cy * wh
+            m_y = max(0.0, w_anchor - m_anchor)
+            w_y = max(0.0, m_anchor - w_anchor)
         else:
             total_h = max(mh, wh)
             m_y = 0.5 * (total_h - mh)
             w_y = 0.5 * (total_h - wh)
         m_placed = m_tl.transform(1.0, 0.0, 0.0, 1.0, 0.0, m_y)
-        w_placed = w_tl.transform(1.0, 0.0, 0.0, 1.0, mw + gap, w_y)
-    elif spec.layout == "stacked":
-        total_w = max(mw, ww)
-        m_x = 0.5 * (total_w - mw)
-        w_x = 0.5 * (total_w - ww)
-        m_placed = m_tl.transform(1.0, 0.0, 0.0, 1.0, m_x, 0.0)
-        w_placed = w_tl.transform(1.0, 0.0, 0.0, 1.0, w_x, mh + gap)
+        w_placed = w_tl.transform(
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            mw + gap + spec.offset_x_u * unit,
+            w_y + spec.offset_y_u * unit,
+        )
     else:
-        total_w = max(mw, ww)
-        m_x = 0.5 * (total_w - mw)
-        w_x = 0.5 * (total_w - ww)
+        if spec.align == "optical_center":
+            m_cx, _ = _ink_centroid_ratio(m_tl, mw, mh)
+            w_cx, _ = _ink_centroid_ratio(w_tl, ww, wh)
+            m_anchor_x = m_cx * mw
+            w_anchor_x = w_cx * ww
+            m_x = max(0.0, w_anchor_x - m_anchor_x)
+            w_x = max(0.0, m_anchor_x - w_anchor_x)
+        else:
+            total_w = max(mw, ww)
+            m_x = 0.5 * (total_w - mw)
+            w_x = 0.5 * (total_w - ww)
         m_placed = m_tl.transform(1.0, 0.0, 0.0, 1.0, m_x, 0.0)
-        w_placed = w_tl.transform(1.0, 0.0, 0.0, 1.0, w_x, mh + gap)
+        w_placed = w_tl.transform(
+            1.0,
+            0.0,
+            0.0,
+            1.0,
+            w_x + spec.offset_x_u * unit,
+            mh + gap + spec.offset_y_u * unit,
+        )
 
     builder = pathops.OpBuilder()
     builder.add(m_placed, pathops.PathOp.UNION)
     builder.add(w_placed, pathops.PathOp.UNION)
 
+    badge_path_design: pathops.Path | None = None
     if spec.layout == "badge":
         bx0, by0, bx1, by1 = (
             min(m_placed.bounds[0], w_placed.bounds[0]),
@@ -114,7 +198,8 @@ def compile_lockup(spec: LockupSpec, base_dir: Path) -> CompiledLockup:
             4.0,
         )
         badge_stroke.convertConicsToQuads(0.05)
-        builder.add(pathops.simplify(badge_stroke, fix_winding=True), pathops.PathOp.UNION)
+        badge_path_design = pathops.simplify(badge_stroke, fix_winding=True)
+        builder.add(badge_path_design, pathops.PathOp.UNION)
 
     combined = builder.resolve()
     combined.convertConicsToQuads(0.05)
@@ -157,8 +242,37 @@ def compile_lockup(spec: LockupSpec, base_dir: Path) -> CompiledLockup:
     )
     guides = f'<g id="clearspace-guides">{guide_2u}{guide_1u}</g>'
 
+    eff_mark_fill = (
+        spec.mark_fill
+        if spec.mark_fill is not None
+        else (spec.fill if spec.fill is not None else mark_spec.post.fill)
+    )
+    eff_wm_fill = (
+        spec.wordmark_fill
+        if spec.wordmark_fill is not None
+        else (spec.fill if spec.fill is not None else wm_spec.post.fill)
+    )
+
     svg_d = path_to_svg_d(norm_path, spec.precision)
-    svg_markup = render_svg_doc(svg_d, canvas, fill="#000000", title=spec.name)
+    if eff_mark_fill == eff_wm_fill:
+        svg_markup = render_svg_doc(svg_d, canvas, fill=eff_mark_fill, title=spec.name)
+    else:
+        m_svg_d = path_to_svg_d(m_placed.transform(*affine), spec.precision)
+        w_svg_d = path_to_svg_d(w_placed.transform(*affine), spec.precision)
+        badge_svg_d = (
+            path_to_svg_d(badge_path_design.transform(*affine), spec.precision)
+            if badge_path_design is not None
+            else None
+        )
+        svg_markup = _render_multi_fill_lockup_svg(
+            m_svg_d,
+            w_svg_d,
+            eff_mark_fill,
+            eff_wm_fill,
+            canvas,
+            spec.name,
+            badge_d=badge_svg_d,
+        )
     clearspace_svg_markup = render_svg_doc(
         svg_d,
         canvas,

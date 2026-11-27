@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "concrete-card",
+  "title": "Concrete Edge Business Card",
+  "category": "print",
+  "background": "background.jpg",
+  "slots": [
+    {
+      "id": "main",
+      "quad": [[214, 408], [718, 180], [1006, 364], [482, 644]],
+      "design_size": [1050, 600],
+      "template_style": "card_editorial",
+      "blend_mode": "luminance_transfer",
+      "opacity": 0.97
+    }
+  ]
+}

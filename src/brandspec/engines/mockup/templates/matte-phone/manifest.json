@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "matte-phone",
+  "title": "Matte Angled Smartphone",
+  "category": "digital",
+  "background": "background.jpg",
+  "slots": [
+    {
+      "id": "main",
+      "quad": [[752, 166], [1030, 307], [446, 711], [176, 509]],
+      "design_size": [600, 1300],
+      "template_style": "phone_splash",
+      "blend_mode": "normal",
+      "opacity": 0.93,
+      "corner_radius": 92
+    }
+  ]
+}

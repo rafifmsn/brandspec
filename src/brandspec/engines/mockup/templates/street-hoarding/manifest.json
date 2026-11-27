@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "street-hoarding",
+  "title": "Street Construction Hoarding",
+  "category": "outdoor",
+  "background": "background.jpg",
+  "slots": [
+    {
+      "id": "left",
+      "quad": [[74, 269], [267, 242], [267, 504], [74, 480]],
+      "design_size": [540, 620],
+      "template_style": "hoarding_panel_left",
+      "blend_mode": "luminance_transfer",
+      "opacity": 0.96
+    },
+    {
+      "id": "mid",
+      "quad": [[284, 238], [616, 192], [616, 546], [284, 505]],
+      "design_size": [720, 680],
+      "template_style": "hoarding_panel_mid",
+      "blend_mode": "luminance_transfer",
+      "opacity": 0.96
+    },
+    {
+      "id": "right",
+      "quad": [[636, 189], [1277, 101], [1277, 635], [636, 551]],
+      "design_size": [1100, 760],
+      "template_style": "hoarding_panel_right",
+      "blend_mode": "luminance_transfer",
+      "opacity": 0.96
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "mailer-box",
+  "title": "Kraft Mailer Box",
+  "category": "packaging",
+  "background": "background.jpg",
+  "slots": [
+    {
+      "id": "main",
+      "quad": [[212, 290], [732, 108], [992, 358], [464, 598]],
+      "design_size": [1000, 780],
+      "template_style": "box_seal",
+      "blend_mode": "multiply",
+      "opacity": 0.88
+    }
+  ]
+}

@@ -189,7 +189,7 @@ def compile_spec(spec: MarkSpec) -> CompiledMark:
             norm_path = pathops.simplify(norm_path, fix_winding=True)
 
     svg_d = path_to_svg_d(norm_path, spec.post.precision)
-    svg_markup = render_svg_doc(svg_d, canvas, fill="#000000", title=spec.name)
+    svg_markup = render_svg_doc(svg_d, canvas, fill=spec.post.fill, title=spec.name)
     grid_svg = grid_overlay_svg(spec.grid, spec.unit, affine, canvas)
     overlay_svg_markup = render_svg_doc(
         svg_d,
