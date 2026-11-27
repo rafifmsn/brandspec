@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from brandspec.cli import main, resolve_skill_target
+from brandspec.cli import SCHEMA_MODELS, discover_system_fonts, main, resolve_skill_target
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_SKILL = REPO_ROOT / "skills" / "brandspec" / "SKILL.md"
@@ -63,3 +64,32 @@ def test_install_skill_resolves_named_presets(monkeypatch, tmp_path: Path) -> No
     assert expected["antigravity"].read_text(encoding="utf-8") == CANONICAL_SKILL.read_text(
         encoding="utf-8"
     )
+
+
+def test_schema_command_emits_valid_json_schema(capsys) -> None:
+    for engine in SCHEMA_MODELS:
+        rc = main(["schema", engine])
+        assert rc == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["type"] == "object"
+        assert "properties" in payload
+
+
+def test_wordmark_fonts_discovery_and_cli(monkeypatch, tmp_path: Path, capsys) -> None:
+    font_dir = tmp_path / "fonts"
+    nested = font_dir / "sans"
+    nested.mkdir(parents=True)
+    ttf = nested / "Inter-Bold.ttf"
+    otf = font_dir / "SpaceMono.otf"
+    ignored = font_dir / "README.txt"
+    ttf.write_bytes(b"")
+    otf.write_bytes(b"")
+    ignored.write_text("ignore", encoding="utf-8")
+
+    discovered = discover_system_fonts(font_dirs=[font_dir])
+    assert discovered == [ttf, otf]
+    assert discover_system_fonts(font_dirs=[font_dir], query="inter") == [ttf]
+
+    monkeypatch.setattr("brandspec.cli._default_font_dirs", lambda: [font_dir])
+    assert main(["wordmark", "fonts", "--query", "space", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out) == [str(otf)]

@@ -20,7 +20,9 @@ brandspec archetypes            # or: uvx brandspec archetypes
 brandspec init <archetype> --out <path/to/spec.json>
 brandspec build <path/to/spec.json> --out-dir <path/to/out>
 brandspec check <path/to/spec.json>
+brandspec schema <engine>       # mark, wordmark, lockup, tokens, kit, icons, pattern, sweep, manifest
 brandspec sweep <path/to/spec.json> --set layers.1.halo=0.35,0.4,0.45 --out-dir <path/to/out>
+brandspec wordmark fonts        # list local .ttf/.otf paths
 brandspec wordmark build <wordmark.spec.json> --out-dir <path/to/out>
 brandspec lockup build <lockup.spec.json> --out-dir <path/to/out>
 brandspec mockup list
@@ -45,6 +47,8 @@ When adding an overpass that re-crosses an earlier band without cutting itself, 
 5. **Preserve 24px legibility**: Keep minimum stripe widths and `halo` gaps large enough (`>= 0.3` unit) so negative space does not collapse at 24px.
 
 ## Schema Quick Reference (`schemaVersion: 1`)
+
+Run `brandspec schema <engine>` to inspect the full JSON Schema for `mark`, `wordmark`, `lockup`, `tokens`, `kit`, `icons`, `pattern`, `sweep`, or `manifest`.
 
 - **Grids (`grid.type`)**, origin `(0, 0)` is centered:
   - `"square"`: `[x, y]` in grid units (`+x` right, `+y` down).

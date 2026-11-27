@@ -16,7 +16,7 @@ from .core.rounds import snapshot_prior_round_before_build
 from .engines.icons.compiler import compile_icon_set
 from .engines.icons.schema import IconSetSpec
 from .engines.kit.exporter import export_kit
-from .engines.kit.schema import KitSpec
+from .engines.kit.schema import BrandManifest, KitSpec
 from .engines.lockup.compiler import compile_lockup
 from .engines.lockup.schema import LockupSpec
 from .engines.mark.artifacts import write_mark_artifacts
@@ -534,6 +534,69 @@ def _extract_accent_from_spec(spec_data: dict) -> str | None:
     return None
 
 
+SCHEMA_MODELS = {
+    "icons": IconSetSpec,
+    "kit": KitSpec,
+    "lockup": LockupSpec,
+    "manifest": BrandManifest,
+    "mark": MarkSpec,
+    "pattern": PatternSpec,
+    "sweep": SweepSpec,
+    "tokens": TokensSpec,
+    "wordmark": WordmarkSpec,
+}
+
+
+def _default_font_dirs() -> list[Path]:
+    home = Path.home()
+    candidates = [
+        Path("/usr/share/fonts"),
+        Path("/usr/local/share/fonts"),
+        home / ".local" / "share" / "fonts",
+        home / ".fonts",
+        Path("/System/Library/Fonts"),
+        Path("/Library/Fonts"),
+        home / "Library" / "Fonts",
+        Path("C:/Windows/Fonts"),
+    ]
+    return [p for p in candidates if p.is_dir()]
+
+
+def discover_system_fonts(
+    font_dirs: list[Path] | None = None,
+    query: str | None = None,
+) -> list[Path]:
+    """Return sorted .ttf and .otf font paths from standard OS font directories."""
+    dirs = _default_font_dirs() if font_dirs is None else [p for p in font_dirs if p.is_dir()]
+    needle = query.strip().lower() if query else ""
+    found: set[Path] = set()
+    for base in dirs:
+        try:
+            for path in base.rglob("*"):
+                if path.is_file() and path.suffix.lower() in {".ttf", ".otf"}:
+                    if not needle or needle in str(path).lower():
+                        found.add(path)
+        except OSError:
+            continue
+    return sorted(found, key=lambda p: str(p).lower())
+
+
+def cmd_schema(args: argparse.Namespace) -> int:
+    model = SCHEMA_MODELS[args.engine]
+    print(json.dumps(model.model_json_schema(), indent=2))
+    return 0
+
+
+def cmd_wordmark_fonts(args: argparse.Namespace) -> int:
+    fonts = discover_system_fonts(query=args.query)
+    if args.json:
+        print(json.dumps([str(p) for p in fonts], indent=2))
+    else:
+        for font in fonts:
+            print(font)
+    return 0
+
+
 def cmd_mockup_list(_args: argparse.Namespace) -> int:
     for _tdir, manifest in discover_templates():
         print(f"{manifest.id:22s} [{manifest.category:9s}] {manifest.title} ({len(manifest.slots)} slot(s))")
@@ -634,6 +697,14 @@ def main(argv: list[str] | None = None) -> int:
     p_check.add_argument("spec", help="Path to spec.json")
     p_check.set_defaults(func=cmd_check)
 
+    p_schema = sub.add_parser("schema", help="Print JSON Schema for a brandspec spec type")
+    p_schema.add_argument(
+        "engine",
+        choices=sorted(SCHEMA_MODELS),
+        help="Spec engine name",
+    )
+    p_schema.set_defaults(func=cmd_schema)
+
     p_skill = sub.add_parser("install-skill", help="Install the bundled SKILL.md for an agent host")
     p_skill.add_argument(
         "--target",
@@ -725,6 +796,10 @@ def main(argv: list[str] | None = None) -> int:
     p_wm_build.add_argument("spec", help="Path to wordmark.spec.json")
     p_wm_build.add_argument("--out-dir", help="Output directory")
     p_wm_build.set_defaults(func=cmd_wordmark_build)
+    p_wm_fonts = wm_sub.add_parser("fonts", help="List available .ttf and .otf system fonts")
+    p_wm_fonts.add_argument("--query", help="Case-insensitive substring filter")
+    p_wm_fonts.add_argument("--json", action="store_true", help="Output paths as a JSON array")
+    p_wm_fonts.set_defaults(func=cmd_wordmark_fonts)
 
     p_lockup = sub.add_parser("lockup", help="Compose mark and wordmark lockups")
     lockup_sub = p_lockup.add_subparsers(dest="lockup_command", required=True)
