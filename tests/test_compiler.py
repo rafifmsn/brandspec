@@ -15,11 +15,10 @@ from brandspec.engines.mark.schema import MarkSpec
 from brandspec.inspect import analyze_compiled
 
 ARCHETYPES_DIR = Path(str(resources.files("brandspec").joinpath("engines/mark/archetypes")))
-SAMPLES_DIR = Path(__file__).resolve().parents[1] / "samples"
 
 
-def test_all_archetypes_and_samples_compile_deterministically() -> None:
-    files = sorted(ARCHETYPES_DIR.glob("*.json")) + sorted(SAMPLES_DIR.glob("*.json"))
+def test_all_archetypes_compile_deterministically() -> None:
+    files = sorted(ARCHETYPES_DIR.glob("*.json"))
     assert len(files) >= 8
 
     for spec_file in files:

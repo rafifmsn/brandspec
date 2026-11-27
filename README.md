@@ -22,14 +22,22 @@
 </p>
 
 <p align="center">
+  <a href="#motivation">Motivation</a> &middot;
   <a href="#architecture">Architecture</a> &middot;
   <a href="#project-layout">Project Layout</a> &middot;
   <a href="#installation">Installation</a> &middot;
   <a href="#specification">Specification</a> &middot;
   <a href="#visual-audit">Visual Audit</a> &middot;
-  <a href="#archetypes">Archetypes</a> &middot;
-  <a href="#development">Development</a>
+  <a href="#archetypes">Archetypes</a>
 </p>
+
+## Motivation
+
+AI agents can reason about brand metaphors and iterative feedback, yet generating raw SVG `<path>` coordinates by hand leads to uneven stroke weights, broken Boolean cutouts, and shapes that collapse at favicon sizes.
+Treating visual identity as unverified text output makes agent-driven brand design unreliable.
+
+`brandspec` solves this by separating design intent from vector math.
+Agents author a compact, grid-aligned `spec.json`, while a deterministic geometry compiler and automated inspection gate (`sheet.png` and `metrics.json`) handle exact path Booleans, scale legibility checks, and production exports across marks, wordmarks, lockups, tokens, icons, patterns, and mockups.
 
 ## Architecture
 
@@ -53,10 +61,6 @@ brandspec/
 ├── LICENSE                           # GNU General Public License v3.0
 ├── pyproject.toml
 ├── skills/brandspec/SKILL.md         # Agent workflow and DSL guide
-├── samples/                          # Reference brand mark specs
-│   ├── kronos-chambers.json
-│   ├── solaris-aperture.json
-│   └── vela-sails.json
 ├── src/brandspec/
 │   ├── cli.py                        # CLI commands and subparsers
 │   ├── core/                         # Shared grid, path, fillet, and round helpers
@@ -71,15 +75,7 @@ brandspec/
 │   │   └── wordmark/                 # Outlined font glyph wordmark compiler
 │   ├── inspect/                      # 4-panel sheet.png renderer and metrics gate
 │   └── studio/                       # Localhost interactive review console
-└── tests/
-    ├── test_cli_skill.py
-    ├── test_compiler.py
-    ├── test_icons_pattern.py
-    ├── test_mockup.py
-    ├── test_studio.py
-    ├── test_sweep.py
-    ├── test_tokens_kit.py
-    └── test_wordmark_lockup.py
+└── tests/                            # Pytest suite
 ```
 
 ## Installation
@@ -123,12 +119,14 @@ npx skills add rafifmsn/brandspec
 | `brandspec init <archetype> --out <path>` | Copies a bundled archetype spec to a working `spec.json`. |
 | `brandspec build <spec.json> [--out-dir <dir>] [--strict]` | Compiles `logo.svg`, `sheet.png`, `metrics.json`, and locked `spec.json`. Exits with code `2` under `--strict` if any quality warning triggers. |
 | `brandspec check <spec.json>` | Validates the schema and prints `metrics.json` without writing output files. |
+| `brandspec schema <engine>` | Prints the JSON Schema for `mark`, `wordmark`, `lockup`, `tokens`, `kit`, `icons`, `pattern`, `sweep`, or `manifest`. |
 | `brandspec sweep <spec.json> [--set path=v1,v2] [--sweep <sweep.json>]` | Compiles a bounded parameter matrix (`--max-variants`, `--only-passed`, `--review`) into studio-ready variants and `contact_sheet.png`. |
 | `brandspec review --dir <dir> [--wait] [--timeout 900]` | Starts the localhost review console and optionally blocks until human pin feedback is submitted to `review.json`. |
 | `brandspec serve --dir <dir> [--port 8420]` | Serves compiled outputs in the localhost review UI. |
 | `brandspec tokens check <tokens.spec.json>` | Audits WCAG 2.1 and APCA contrast across declared token and surface pairs. |
 | `brandspec palette extract <image> [--colors 6] [--out <path>]` | Quantizes a reference image into deterministic hex `tokens.spec.json`. |
 | `brandspec kit build <kit.spec.json> [--out-dir <dir>]` | Exports SVG variants, `favicon.ico`, PWA icons, `og-card.png`, and `tokens.css`. |
+| `brandspec wordmark fonts [--query <text>] [--json]` | Lists available `.ttf` and `.otf` system font paths for wordmarks. |
 | `brandspec wordmark build <wordmark.spec.json> [--out-dir <dir>]` | Outlines `.ttf`/`.otf` glyphs via `fontTools` with kerning, ink traps, stencil cuts, and `sheet.png`. |
 | `brandspec lockup build <lockup.spec.json> [--out-dir <dir>]` | Pairs mark and wordmark into horizontal, stacked, or badge lockups with optical alignment, clearspace guides, and `sheet.png`. |
 | `brandspec mockup list` | Lists all bundled photographic mockup scene templates. |
@@ -136,6 +134,17 @@ npx skills add rafifmsn/brandspec
 | `brandspec icons build <icons.spec.json> [--out-dir <dir>]` | Compiles matched `24x24` icon sets inheriting mark geometry defaults. |
 | `brandspec pattern build <pattern.spec.json> [--out-dir <dir>]` | Compiles 3x3 periodic-wrapped seamless tiling SVG patterns. |
 | `brandspec install-skill [--target <preset-or-path>] [--force]` | Installs the bundled `SKILL.md` for AI agents (`agents`, `project`, `claude`, `cursor`, `codex`, `antigravity`, or a custom path). |
+
+### Development
+
+Run the test suite and build locally from a synced clone:
+
+```bash
+uv run pytest -v
+uv build
+```
+
+In offline or sandboxed environments where `uv run` cannot resolve build dependencies, invoke `.venv/bin/pytest` and `.venv/bin/brandspec` directly.
 
 ## Specification
 
@@ -182,13 +191,6 @@ Every `brandspec build` outputs:
 | `line-screen-disc` | `effect` | `square` | Linearly modulated stripes clipped to a sphere with diagonal cut |
 | `radial-vortex` | `effect` | `polar` | Six-blade twisted optical aperture |
 | `stencil-monogram` | `monogram` | `square` | Modular figure-ground letterform with rounded arches |
-| `samples/vela-sails.json` | `effect` | `square` | Concave curved sails over a modulated stripe hull |
-| `samples/solaris-aperture.json` | `effect` | `polar` | Eight-blade kinetic core inside a segmented corona ring |
-| `samples/kronos-chambers.json` | `geometric` | `square` | Four-way interlocking acoustic chambers around a central core |
-
-## Development
-
-```bash
-uv run pytest -v
-uv build
-```
+| `vela-sails` | `effect` | `square` | Concave curved sails over a modulated stripe hull |
+| `solaris-aperture` | `effect` | `polar` | Eight-blade kinetic core inside a segmented corona ring |
+| `kronos-chambers` | `geometric` | `square` | Four-way interlocking acoustic chambers around a central core |
