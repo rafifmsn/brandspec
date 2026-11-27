@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./brandspec-thumb.jpg" alt="Brandspec" width="100%" />
+  <img src="./brandspec-thumb-1.jpg" alt="Brandspec" width="100%" />
 </p>
 
 <p align="center">
@@ -181,6 +181,10 @@ Every `brandspec build` outputs:
 2. `sheet.png`: 4-panel visual sheet showing (1) the construction grid overlay, (2) 400px positive render, (3) 400px inverted render, and (4) 96px, 48px, and 24px positive/inverted scale tests.
 3. `metrics.json`: Automated checks covering `ink_ratio` (target `0.16` to `0.72`), `ink_ratio_24px` (`0.06` to `0.74`), `bbox_aspect` (`<= 2.6`), `island_count`, `tiny_island_count` (`0` tolerated), and `optical_drift_pct`.
 4. `spec.json`: Locked specification for deterministic reproduction.
+
+<p align="center">
+  <img src="./brandspec-thumb-2.jpg" alt="Brandspec Studio Review, Archetype Marks, and Perspective Mockups" width="100%" />
+</p>
 
 ## Archetypes
 
